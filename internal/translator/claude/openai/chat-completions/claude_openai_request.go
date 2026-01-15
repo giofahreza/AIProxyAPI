@@ -135,6 +135,9 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 	// Stream configuration to enable or disable streaming responses
 	out, _ = sjson.Set(out, "stream", stream)
 
+	// Track skipped tool call IDs to filter out their corresponding tool results
+	skippedToolCallIDs := make(map[string]bool)
+
 	// Process messages and transform them to Claude Code format
 	if messages := root.Get("messages"); messages.Exists() && messages.IsArray() {
 		messages.ForEach(func(_, message gjson.Result) bool {
@@ -198,9 +201,17 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 							}
 
 							function := toolCall.Get("function")
+							functionName := function.Get("name").String()
+
+							// Skip tool calls with empty names (validation requirement for Claude API)
+							if functionName == "" {
+								skippedToolCallIDs[toolCallID] = true
+								return true
+							}
+
 							toolUse := `{"type":"tool_use","id":"","name":"","input":{}}`
 							toolUse, _ = sjson.Set(toolUse, "id", toolCallID)
-							toolUse, _ = sjson.Set(toolUse, "name", function.Get("name").String())
+							toolUse, _ = sjson.Set(toolUse, "name", functionName)
 
 							// Parse arguments for the tool call
 							if args := function.Get("arguments"); args.Exists() {
@@ -230,6 +241,12 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 			case "tool":
 				// Handle tool result messages conversion
 				toolCallID := message.Get("tool_call_id").String()
+
+				// Skip tool results for skipped tool calls
+				if skippedToolCallIDs[toolCallID] {
+					return true
+				}
+
 				content := message.Get("content").String()
 
 				msg := `{"role":"user","content":[{"type":"tool_result","tool_use_id":"","content":""}]}`

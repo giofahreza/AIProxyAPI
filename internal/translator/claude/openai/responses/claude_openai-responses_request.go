@@ -138,6 +138,9 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 		}
 	}
 
+	// Track skipped tool call IDs to filter out their corresponding tool results
+	skippedToolCallIDs := make(map[string]bool)
+
 	// input array processing
 	if input := root.Get("input"); input.Exists() && input.IsArray() {
 		input.ForEach(func(_, item gjson.Result) bool {
@@ -253,6 +256,13 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 					callID = genToolCallID()
 				}
 				name := item.Get("name").String()
+
+				// Skip tool calls with empty names (validation requirement for Claude API)
+				if name == "" {
+					skippedToolCallIDs[callID] = true
+					break
+				}
+
 				argsStr := item.Get("arguments").String()
 
 				toolUse := `{"type":"tool_use","id":"","name":"","input":{}}`
@@ -272,6 +282,12 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 			case "function_call_output":
 				// Map to user tool_result
 				callID := item.Get("call_id").String()
+
+				// Skip tool results for skipped tool calls
+				if skippedToolCallIDs[callID] {
+					break
+				}
+
 				outputStr := item.Get("output").String()
 				toolResult := `{"type":"tool_result","tool_use_id":"","content":""}`
 				toolResult, _ = sjson.Set(toolResult, "tool_use_id", callID)
