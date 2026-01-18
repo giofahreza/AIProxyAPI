@@ -33,12 +33,12 @@
         <!-- Header -->
         <header class="header">
             <div class="header-left">
+                <button id="menuToggleBtn" class="btn btn-sm menu-toggle">☰</button>
                 <h1 class="header-title">CLIProxyAPI Management</h1>
                 <span id="connectionStatus" class="badge">Disconnected</span>
             </div>
             <div class="header-right">
                 <span id="serverInfo"></span>
-                <button id="logoutBtn" class="btn btn-sm">Logout</button>
             </div>
         </header>
 
@@ -66,7 +66,13 @@
                 <a href="#logs" class="nav-item" data-page="logs">Logs</a>
                 <a href="#settings" class="nav-item" data-page="settings">Settings</a>
             </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-danger btn-block">Logout</button>
+            </div>
         </aside>
+
+        <!-- Sidebar Overlay (for mobile) -->
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
         <!-- Main Content Area -->
         <main class="main-content">
@@ -75,17 +81,17 @@
     </div>
 
     <!-- Load Scripts -->
-    <script src="frontend/js/utils.js?v=3"></script>
-    <script src="frontend/js/api.js?v=3"></script>
-    <script src="frontend/js/pages/dashboard.js?v=3"></script>
-    <script src="frontend/js/pages/settings.js?v=3"></script>
-    <script src="frontend/js/pages/api-keys.js?v=3"></script>
-    <script src="frontend/js/pages/providers.js?v=3"></script>
-    <script src="frontend/js/pages/auth-files.js?v=3"></script>
-    <script src="frontend/js/pages/oauth.js?v=3"></script>
-    <script src="frontend/js/pages/quota.js?v=3"></script>
-    <script src="frontend/js/pages/usage.js?v=3"></script>
-    <script src="frontend/js/pages/logs.js?v=3"></script>
-    <script src="frontend/js/app.js?v=3"></script>
+    <script src="frontend/js/utils.js?v=4"></script>
+    <script src="frontend/js/api.js?v=4"></script>
+    <script src="frontend/js/pages/dashboard.js?v=4"></script>
+    <script src="frontend/js/pages/settings.js?v=4"></script>
+    <script src="frontend/js/pages/api-keys.js?v=4"></script>
+    <script src="frontend/js/pages/providers.js?v=4"></script>
+    <script src="frontend/js/pages/auth-files.js?v=4"></script>
+    <script src="frontend/js/pages/oauth.js?v=4"></script>
+    <script src="frontend/js/pages/quota.js?v=4"></script>
+    <script src="frontend/js/pages/usage.js?v=4"></script>
+    <script src="frontend/js/pages/logs.js?v=4"></script>
+    <script src="frontend/js/app.js?v=4"></script>
 </body>
 </html>

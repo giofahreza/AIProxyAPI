@@ -1137,21 +1137,137 @@ code {
     overflow-y: auto;
 }
 
+/* Sidebar Footer */
+.sidebar-footer {
+    padding: 15px;
+    border-top: 1px solid var(--border-color);
+    margin-top: auto;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Menu Toggle Button */
+.menu-toggle {
+    display: none;
+    font-size: 18px;
+    padding: 5px 10px;
+    margin-right: 10px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
-    .sidebar {
+    .menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .header {
+        padding: 0 10px;
+    }
+
+    .header-left {
+        gap: 8px;
+    }
+
+    .header-left .badge {
         display: none;
+    }
+
+    .header-right {
+        display: none;
+    }
+
+    .header-title {
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: -250px;
+        top: 60px;
+        bottom: 0;
+        width: 250px;
+        z-index: 1000;
+        transition: left 0.3s ease;
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+
+    .sidebar-overlay.open {
+        display: block;
     }
 
     .main-content {
         margin-left: 0;
+        padding: 15px;
     }
 
-    .grid-2 {
-        grid-template-columns: 1fr;
+    .card {
+        margin-bottom: 15px;
     }
 
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .grid-2,
     .grid-3 {
         grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card {
+        padding: 15px;
+    }
+
+    .stat-value {
+        font-size: 20px !important;
+        word-break: break-all;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .btn-block {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-title {
+        font-size: 13px;
+    }
+
+    .main-content {
+        padding: 10px;
+    }
+
+    .card-body {
+        padding: 15px;
     }
 }

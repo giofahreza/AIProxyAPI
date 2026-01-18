@@ -37,6 +37,36 @@ const App = {
     showMainScreen() {
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('mainScreen').classList.remove('hidden');
+        this.setupMenuToggle();
+    },
+
+    // Setup mobile menu toggle
+    setupMenuToggle() {
+        const menuToggle = document.getElementById('menuToggleBtn');
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        if (menuToggle) {
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('open');
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('open');
+            });
+        }
+    },
+
+    // Close mobile menu
+    closeMobileMenu() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
     },
 
     // Setup login form
@@ -116,6 +146,9 @@ const App = {
     navigateTo(page) {
         this.currentPage = page;
         window.location.hash = page;
+
+        // Close mobile menu
+        this.closeMobileMenu();
 
         // Update active nav item
         document.querySelectorAll('.nav-item').forEach(item => {
