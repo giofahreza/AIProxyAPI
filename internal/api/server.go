@@ -309,7 +309,11 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 // setupRoutes configures the API routes for the server.
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
+	// Serve frontend at root and /management.html
+	s.engine.GET("/", s.serveManagementControlPanel)
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
+	// Serve frontend static files
+	s.engine.Static("/frontend", "./frontend")
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	geminiHandlers := gemini.NewGeminiAPIHandler(s.handlers)
 	geminiCLIHandlers := gemini.NewGeminiCLIAPIHandler(s.handlers)
@@ -337,8 +341,8 @@ func (s *Server) setupRoutes() {
 		v1beta.GET("/models/*action", geminiHandlers.GeminiGetHandler)
 	}
 
-	// Root endpoint
-	s.engine.GET("/", func(c *gin.Context) {
+	// API info endpoint (moved from root)
+	s.engine.GET("/api", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "CLI Proxy API Server",
 			"endpoints": []string{
@@ -644,6 +648,15 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
+
+	// Serve the new frontend index.html
+	frontendPath := filepath.Join("frontend", "index.html")
+	if _, err := os.Stat(frontendPath); err == nil {
+		c.File(frontendPath)
+		return
+	}
+
+	// Fallback to old static management.html if frontend doesn't exist
 	filePath := managementasset.FilePath(s.configFilePath)
 	if strings.TrimSpace(filePath) == "" {
 		c.AbortWithStatus(http.StatusNotFound)
