@@ -4,6 +4,18 @@ async function renderSettings(container) {
     try {
         const config = await API.getConfig();
 
+        // API uses kebab-case keys, handle both formats for compatibility
+        const loggingToFile = config['logging-to-file'] ?? config.logging_to_file ?? false;
+        const requestLog = config['request-log'] ?? config.request_log ?? false;
+        const usageStats = config['usage-statistics-enabled'] ?? config.usage_statistics_enabled ?? false;
+        const wsAuth = config['ws-auth'] ?? config.ws_auth ?? false;
+        const forceModelPrefix = config['force-model-prefix'] ?? config.force_model_prefix ?? false;
+        const proxyUrl = config['proxy-url'] ?? config.proxy_url ?? '';
+        const requestRetry = config['request-retry'] ?? config.request_retry ?? 3;
+        const maxRetryInterval = config['max-retry-interval'] ?? config.max_retry_interval ?? 30;
+        const logsMaxSize = config['logs-max-total-size-mb'] ?? config.logs_max_total_size_mb ?? 0;
+        const quotaExceeded = config['quota-exceeded'] ?? config.quota_exceeded ?? {};
+
         container.innerHTML = `
             <div class="card">
                 <div class="card-header">
@@ -22,7 +34,7 @@ async function renderSettings(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="loggingToFile" ${config.logging_to_file ? 'checked' : ''}>
+                            <input type="checkbox" id="loggingToFile" ${loggingToFile ? 'checked' : ''}>
                             <span>Logging to File</span>
                         </label>
                         <small>Write application logs to rotating files</small>
@@ -30,7 +42,7 @@ async function renderSettings(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="requestLog" ${config.request_log ? 'checked' : ''}>
+                            <input type="checkbox" id="requestLog" ${requestLog ? 'checked' : ''}>
                             <span>Request Logging</span>
                         </label>
                         <small>Log HTTP requests and responses</small>
@@ -38,7 +50,7 @@ async function renderSettings(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="usageStats" ${config.usage_statistics_enabled ? 'checked' : ''}>
+                            <input type="checkbox" id="usageStats" ${usageStats ? 'checked' : ''}>
                             <span>Usage Statistics</span>
                         </label>
                         <small>Enable usage statistics tracking</small>
@@ -46,7 +58,7 @@ async function renderSettings(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="wsAuth" ${config.ws_auth ? 'checked' : ''}>
+                            <input type="checkbox" id="wsAuth" ${wsAuth ? 'checked' : ''}>
                             <span>WebSocket Authentication</span>
                         </label>
                         <small>Require authentication for WebSocket connections</small>
@@ -54,7 +66,7 @@ async function renderSettings(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="forceModelPrefix" ${config.force_model_prefix ? 'checked' : ''}>
+                            <input type="checkbox" id="forceModelPrefix" ${forceModelPrefix ? 'checked' : ''}>
                             <span>Force Model Prefix</span>
                         </label>
                         <small>Only use credentials with matching prefix</small>
@@ -62,26 +74,26 @@ async function renderSettings(container) {
 
                     <div class="form-group">
                         <label for="proxyUrl">Proxy URL</label>
-                        <input type="text" id="proxyUrl" value="${escapeHtml(config.proxy_url || '')}"
+                        <input type="text" id="proxyUrl" value="${escapeHtml(proxyUrl)}"
                                placeholder="socks5://user:pass@host:port">
                         <small>HTTP/SOCKS5 proxy for outgoing requests</small>
                     </div>
 
                     <div class="form-group">
                         <label for="requestRetry">Request Retry Count</label>
-                        <input type="number" id="requestRetry" value="${config.request_retry || 3}" min="0" max="10">
+                        <input type="number" id="requestRetry" value="${requestRetry}" min="0" max="10">
                         <small>Number of times to retry failed requests</small>
                     </div>
 
                     <div class="form-group">
                         <label for="maxRetryInterval">Max Retry Interval (seconds)</label>
-                        <input type="number" id="maxRetryInterval" value="${config.max_retry_interval || 30}" min="0" max="300">
+                        <input type="number" id="maxRetryInterval" value="${maxRetryInterval}" min="0" max="300">
                         <small>Maximum wait time before retry</small>
                     </div>
 
                     <div class="form-group">
                         <label for="logsMaxSize">Logs Max Total Size (MB)</label>
-                        <input type="number" id="logsMaxSize" value="${config.logs_max_total_size_mb || 0}" min="0">
+                        <input type="number" id="logsMaxSize" value="${logsMaxSize}" min="0">
                         <small>0 = unlimited. Old log files deleted when exceeded.</small>
                     </div>
 

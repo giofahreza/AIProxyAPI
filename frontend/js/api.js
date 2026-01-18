@@ -150,8 +150,10 @@ const API = {
     },
 
     // === AI Providers ===
-    getGeminiKeys() {
-        return this.get('/gemini-api-key');
+    // API returns {"gemini-api-key": [...]} - extract the array
+    async getGeminiKeys() {
+        const data = await this.get('/gemini-api-key');
+        return data?.['gemini-api-key'] || data?.geminiApiKey || [];
     },
 
     addGeminiKey(config) {
@@ -166,8 +168,10 @@ const API = {
         return this.delete('/gemini-api-key', { value: [apiKey] });
     },
 
-    getClaudeKeys() {
-        return this.get('/claude-api-key');
+    // API returns {"claude-api-key": [...]} - extract the array
+    async getClaudeKeys() {
+        const data = await this.get('/claude-api-key');
+        return data?.['claude-api-key'] || data?.claudeApiKey || [];
     },
 
     addClaudeKey(config) {
@@ -182,8 +186,10 @@ const API = {
         return this.delete('/claude-api-key', { value: [apiKey] });
     },
 
-    getCodexKeys() {
-        return this.get('/codex-api-key');
+    // API returns {"codex-api-key": [...]} - extract the array
+    async getCodexKeys() {
+        const data = await this.get('/codex-api-key');
+        return data?.['codex-api-key'] || data?.codexApiKey || [];
     },
 
     addCodexKey(config) {
@@ -198,8 +204,10 @@ const API = {
         return this.delete('/codex-api-key', { value: [apiKey] });
     },
 
-    getVertexKeys() {
-        return this.get('/vertex-api-key');
+    // API returns {"vertex-api-key": [...]} - extract the array
+    async getVertexKeys() {
+        const data = await this.get('/vertex-api-key');
+        return data?.['vertex-api-key'] || data?.vertexApiKey || [];
     },
 
     addVertexKey(config) {
@@ -214,8 +222,10 @@ const API = {
         return this.delete('/vertex-api-key', { value: [apiKey] });
     },
 
-    getOpenAICompat() {
-        return this.get('/openai-compatibility');
+    // API returns {"openai-compatibility": [...]} - extract the array
+    async getOpenAICompat() {
+        const data = await this.get('/openai-compatibility');
+        return data?.['openai-compatibility'] || data?.openaiCompatibility || [];
     },
 
     addOpenAICompat(config) {
@@ -390,6 +400,38 @@ const API = {
     // === System ===
     getLatestVersion() {
         return this.get('/latest-version');
+    },
+
+    async getServerVersion() {
+        // Server version is returned in X-CPA-VERSION header
+        const url = `${this.baseUrl}/v0/management/config`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        return {
+            version: response.headers.get('X-CPA-VERSION') || 'unknown',
+            status: response.status
+        };
+    },
+
+    async getAvailableModels() {
+        // Fetch models from the /v1/models endpoint
+        const url = `${this.baseUrl}/v1/models`;
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            return data.data || data.models || [];
+        } catch (error) {
+            console.error('Failed to fetch models:', error);
+            return [];
+        }
     },
 
     // === Ampcode ===

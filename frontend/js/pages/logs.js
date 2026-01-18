@@ -35,7 +35,10 @@ async function loadLogs() {
     const logsDiv = document.getElementById('logsContent');
     try {
         const logs = await API.getLogs();
-        if (logs) {
+        // Handle case where logging is disabled - API returns { error: "..." }
+        if (logs && typeof logs === 'object' && logs.error) {
+            logsDiv.innerHTML = '<div class="alert alert-info">' + escapeHtml(logs.error) + '</div>';
+        } else if (logs && typeof logs === 'string' && logs.trim()) {
             logsDiv.innerHTML = '<pre style="max-height: 600px; overflow-y: auto;">' + escapeHtml(logs) + '</pre>';
         } else {
             logsDiv.innerHTML = '<p class="text-center">No logs available</p>';
@@ -86,6 +89,15 @@ async function refreshErrorLogs() {
 async function downloadLogs() {
     try {
         const logs = await API.getLogs();
+        // Handle case where logging is disabled
+        if (logs && typeof logs === 'object' && logs.error) {
+            showAlert(logs.error, 'warning');
+            return;
+        }
+        if (!logs || (typeof logs === 'string' && !logs.trim())) {
+            showAlert('No logs available to download', 'warning');
+            return;
+        }
         downloadFile(logs, 'logs.txt', 'text/plain');
         showAlert('Logs downloaded successfully!', 'success');
     } catch (error) {

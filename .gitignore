@@ -39,11 +39,22 @@ GEMINI.md
 .serena/*
 .agent/*
 .agents/*
-.agents/*
 .opencode/*
 .bmad/*
 _bmad/*
 _bmad-output/*
+
+# MCP (Model Context Protocol)
+.mcp.json
+.playwright-mcp/
+
+# Node.js (for testing only)
+node_modules/
+package.json
+package-lock.json
+
+# Test files
+test-*.js
 
 # macOS
 .DS_Store

@@ -3,7 +3,14 @@
 async function renderDashboard(container) {
     try {
         const config = await API.getConfig();
-        const usage = await API.getUsage().catch(() => null);
+        const usageData = await API.getUsage().catch(() => null);
+
+        // API uses kebab-case keys
+        const requestLog = config['request-log'] ?? config.request_log ?? false;
+
+        // Usage API returns { usage: { total_requests, ... } }
+        const usage = usageData?.usage || usageData || {};
+        const totalRequests = usage.total_requests || 0;
 
         container.innerHTML = `
             <div class="card">
@@ -23,12 +30,12 @@ async function renderDashboard(container) {
                         </div>
                         <div class="stat-card">
                             <div class="stat-label">Request Logging</div>
-                            <div class="stat-value">${config.request_log ? 'ON' : 'OFF'}</div>
+                            <div class="stat-value">${requestLog ? 'ON' : 'OFF'}</div>
                         </div>
-                        ${usage && usage.total_requests !== undefined ? `
+                        ${usageData ? `
                         <div class="stat-card">
                             <div class="stat-label">Total Requests</div>
-                            <div class="stat-value">${usage.total_requests || 0}</div>
+                            <div class="stat-value">${totalRequests}</div>
                         </div>
                         ` : ''}
                     </div>

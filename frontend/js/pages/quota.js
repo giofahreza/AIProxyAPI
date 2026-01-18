@@ -4,6 +4,11 @@ async function renderQuota(container) {
     try {
         const config = await API.getConfig();
 
+        // API uses kebab-case keys
+        const quotaExceeded = config['quota-exceeded'] || config.quota_exceeded || {};
+        const switchProject = quotaExceeded['switch-project'] ?? quotaExceeded.switch_project ?? false;
+        const switchPreviewModel = quotaExceeded['switch-preview-model'] ?? quotaExceeded.switch_preview_model ?? false;
+
         container.innerHTML = `
             <div class="card">
                 <div class="card-header">
@@ -16,7 +21,7 @@ async function renderQuota(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="switchProject" ${config.quota_exceeded?.switch_project ? 'checked' : ''}>
+                            <input type="checkbox" id="switchProject" ${switchProject ? 'checked' : ''}>
                             <span>Switch Project on Quota Exceeded</span>
                         </label>
                         <small>Automatically switch to another project when quota is exceeded</small>
@@ -24,7 +29,7 @@ async function renderQuota(container) {
 
                     <div class="form-group">
                         <label class="toggle">
-                            <input type="checkbox" id="switchPreviewModel" ${config.quota_exceeded?.switch_preview_model ? 'checked' : ''}>
+                            <input type="checkbox" id="switchPreviewModel" ${switchPreviewModel ? 'checked' : ''}>
                             <span>Switch to Preview Model on Quota Exceeded</span>
                         </label>
                         <small>Automatically switch to preview model when quota is exceeded</small>
