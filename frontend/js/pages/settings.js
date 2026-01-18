@@ -2,7 +2,10 @@
 
 async function renderSettings(container) {
     try {
-        const config = await API.getConfig();
+        const [config, yaml] = await Promise.all([
+            API.getConfig(),
+            API.getConfigYAML()
+        ]);
 
         // API uses kebab-case keys, handle both formats for compatibility
         const loggingToFile = config['logging-to-file'] ?? config.logging_to_file ?? false;
@@ -109,6 +112,25 @@ async function renderSettings(container) {
                     <button class="btn btn-success" onclick="saveSettings()">Save All Settings</button>
                 </div>
             </div>
+
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h2 class="card-title">Configuration (YAML)</h2>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="reloadConfigYAML()">Reload</button>
+                        <button class="btn btn-success btn-sm" onclick="saveConfigYAML()">Save YAML</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="configAlert"></div>
+                    <p class="alert alert-warning">
+                        <strong>Warning:</strong> Direct YAML editing can break your configuration if syntax is invalid. Make sure you know what you're doing!
+                    </p>
+                    <div class="form-group">
+                        <textarea id="configYaml" rows="25" style="font-family: 'Courier New', monospace; font-size: 13px;">${escapeHtml(yaml)}</textarea>
+                    </div>
+                </div>
+            </div>
         `;
 
         // Setup event listeners for toggles (instant save)
@@ -173,6 +195,28 @@ async function saveSettings() {
         alertDiv.innerHTML = '<div class="alert alert-success">All settings saved successfully!</div>';
         await App.refreshConfig();
         setTimeout(() => alertDiv.innerHTML = '', 3000);
+    } catch (error) {
+        alertDiv.innerHTML = `<div class="alert alert-error">Failed to save: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+async function reloadConfigYAML() {
+    try {
+        const yaml = await API.getConfigYAML();
+        document.getElementById('configYaml').value = yaml;
+        showAlert('Configuration reloaded', 'info');
+    } catch (error) {
+        showAlert('Failed to reload: ' + error.message, 'error');
+    }
+}
+
+async function saveConfigYAML() {
+    const alertDiv = document.getElementById('configAlert');
+    try {
+        const yaml = document.getElementById('configYaml').value;
+        await API.saveConfigYAML(yaml);
+        alertDiv.innerHTML = '<div class="alert alert-success">Configuration saved! Changes will take effect after server restart.</div>';
+        await App.refreshConfig();
     } catch (error) {
         alertDiv.innerHTML = `<div class="alert alert-error">Failed to save: ${escapeHtml(error.message)}</div>`;
     }

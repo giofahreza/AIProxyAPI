@@ -86,12 +86,22 @@ const App = {
 
     // Setup navigation
     setupNavigation() {
+        // Handle regular nav items
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const page = item.dataset.page;
                 this.navigateTo(page);
+            });
+        });
+
+        // Handle dropdown toggles
+        const dropdownToggles = document.querySelectorAll('.nav-dropdown-toggle');
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                const dropdown = toggle.parentElement;
+                dropdown.classList.toggle('open');
             });
         });
     },
@@ -113,6 +123,16 @@ const App = {
                 item.classList.add('active');
             } else {
                 item.classList.remove('active');
+            }
+        });
+
+        // Update dropdown states
+        document.querySelectorAll('.nav-dropdown').forEach(dropdown => {
+            const hasActiveChild = dropdown.querySelector('.nav-item.active');
+            if (hasActiveChild) {
+                dropdown.classList.add('has-active', 'open');
+            } else {
+                dropdown.classList.remove('has-active');
             }
         });
 
@@ -151,14 +171,8 @@ const App = {
             case 'usage':
                 renderUsage(container);
                 break;
-            case 'config':
-                renderConfig(container);
-                break;
             case 'logs':
                 renderLogs(container);
-                break;
-            case 'system':
-                renderSystem(container);
                 break;
             default:
                 container.innerHTML = '<div class="alert alert-error">Page not found</div>';
