@@ -142,11 +142,15 @@ const API = {
     },
 
     addAPIKey(key) {
-        return this.put('/api-keys', { value: [key] });
+        return this.request('/api-keys', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([key])
+        });
     },
 
     deleteAPIKey(key) {
-        return this.delete('/api-keys', { value: [key] });
+        return this.delete('/api-keys?' + buildQuery({ value: key }));
     },
 
     // === AI Providers ===
