@@ -39,8 +39,8 @@ jobs:
             cd ~/CLIProxyAPI
 
             # Pull latest code
-            git fetch origin
-            git pull origin main
+            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch giofahreza
+            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git pull giofahreza main
 
             # Backup and replace binary
             if [ -f cliproxyapi ]; then
