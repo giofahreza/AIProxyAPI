@@ -142,11 +142,7 @@ const API = {
     },
 
     addAPIKey(key) {
-        return this.request('/api-keys', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify([key])
-        });
+        return this.patch('/api-keys', { new: key });
     },
 
     deleteAPIKey(key) {
