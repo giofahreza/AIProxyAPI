@@ -1,0 +1,63 @@
+name: Deploy to Oracle Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build binary
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o cliproxyapi cmd/server/main.go
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/oracle.key
+          chmod 600 ~/.ssh/oracle.key
+          ssh-keyscan -H ${{ secrets.ORACLE_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          # Copy binary to server
+          scp -i ~/.ssh/oracle.key cliproxyapi ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/CLIProxyAPI/cliproxyapi.new
+
+          # SSH into server and deploy
+          ssh -i ~/.ssh/oracle.key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'ENDSSH'
+            cd ~/CLIProxyAPI
+
+            # Pull latest code
+            git fetch origin
+            git pull origin main
+
+            # Backup and replace binary
+            if [ -f cliproxyapi ]; then
+              cp cliproxyapi cliproxyapi.backup.$(date +%Y%m%d_%H%M%S)
+            fi
+            mv cliproxyapi.new cliproxyapi
+            chmod +x cliproxyapi
+
+            # Restart service
+            sudo systemctl restart cliproxyapi.service
+
+            # Check status
+            sleep 2
+            sudo systemctl status cliproxyapi.service --no-pager
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          echo "✅ Deployment complete!"
+          echo "🔗 Service should be running at http://${{ secrets.ORACLE_HOST }}:8317"
