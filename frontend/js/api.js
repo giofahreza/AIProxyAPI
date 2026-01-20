@@ -142,7 +142,7 @@ const API = {
     },
 
     addAPIKey(key) {
-        return this.patch('/api-keys', { new: key });
+        return this.patch('/api-keys', { old: "", new: key });
     },
 
     deleteAPIKey(key) {
