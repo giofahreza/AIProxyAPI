@@ -18,7 +18,7 @@ async function renderAPIKeys(container) {
                             <thead>
                                 <tr>
                                     <th>API Key</th>
-                                    <th width="100">Actions</th>
+                                    <th width="150">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -26,7 +26,8 @@ async function renderAPIKeys(container) {
                                     <tr>
                                         <td><code>${escapeHtml(key)}</code></td>
                                         <td>
-                                            <button class="btn btn-danger btn-sm" onclick="deleteAPIKey('${escapeHtml(key)}')">Delete</button>
+                                            <button class="btn btn-primary btn-sm" onclick="editAPIKey('${escapeHtml(key).replace(/'/g, "\\'")}')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteAPIKey('${escapeHtml(key).replace(/'/g, "\\'")}')">Delete</button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -60,6 +61,29 @@ function showAddAPIKeyDialog() {
             renderAPIKeys(document.getElementById('pageContent'));
         } catch (error) {
             showAlert('Failed to add API key: ' + error.message, 'error');
+        }
+    });
+}
+
+function editAPIKey(oldKey) {
+    showModal('Edit API Key', `
+        <div class="form-group">
+            <label for="editApiKey">API Key</label>
+            <input type="text" id="editApiKey" value="${escapeHtml(oldKey)}" placeholder="your-api-key">
+        </div>
+    `, async () => {
+        const newKey = document.getElementById('editApiKey').value.trim();
+        if (!newKey) {
+            alert('Please enter an API key');
+            return;
+        }
+
+        try {
+            await API.patch('/api-keys', { old: oldKey, new: newKey });
+            showAlert('API key updated successfully', 'success');
+            renderAPIKeys(document.getElementById('pageContent'));
+        } catch (error) {
+            showAlert('Failed to update API key: ' + error.message, 'error');
         }
     });
 }
