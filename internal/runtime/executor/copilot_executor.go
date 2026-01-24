@@ -18,6 +18,7 @@ import (
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
@@ -65,7 +66,9 @@ func (e *CopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, 
 	if err != nil {
 		return resp, err
 	}
-	applyCopilotHeaders(httpReq, token)
+	// Auto-detect X-Initiator based on message content to control premium request billing
+	xInitiator := detectXInitiator(opts, body)
+	applyCopilotHeaders(httpReq, token, xInitiator)
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -151,7 +154,9 @@ func (e *CopilotExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.
 	if err != nil {
 		return nil, err
 	}
-	applyCopilotHeaders(httpReq, token)
+	// Auto-detect X-Initiator based on message content to control premium request billing
+	xInitiator := detectXInitiator(opts, body)
+	applyCopilotHeaders(httpReq, token, xInitiator)
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -282,7 +287,15 @@ func (e *CopilotExecutor) ensureValidToken(ctx context.Context, auth *cliproxyau
 }
 
 // applyCopilotHeaders adds required GitHub Copilot headers
-func applyCopilotHeaders(req *http.Request, token string) {
+// The xInitiator parameter controls premium request billing:
+//   - "user": The request counts as a premium request (user-initiated message)
+//   - "agent": The request does not consume premium quota (agent/tool-initiated)
+//
+// When xInitiator is empty, it defaults to "agent" to avoid accidentally consuming
+// premium requests for agentic workflows. Clients should explicitly set "user"
+// for the initial user-initiated message only.
+// See: https://docs.github.com/en/copilot/concepts/billing/copilot-requests
+func applyCopilotHeaders(req *http.Request, token string, xInitiator string) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -291,8 +304,15 @@ func applyCopilotHeaders(req *http.Request, token string) {
 	req.Header.Set("Editor-Plugin-Version", "copilot-chat/0.11.1")
 	req.Header.Set("Openai-Organization", "github-copilot")
 	req.Header.Set("Openai-Intent", "conversation-panel")
+	req.Header.Set("Copilot-Integration-Id", "vscode-chat")
 	req.Header.Set("VScode-SessionId", randomHex(16))
 	req.Header.Set("VScode-MachineId", randomHex(32))
+	// X-Initiator controls premium request billing. Default to "agent" to avoid
+	// burning premium requests unnecessarily for agentic/tool-initiated flows.
+	if xInitiator == "" {
+		xInitiator = "agent"
+	}
+	req.Header.Set("X-Initiator", xInitiator)
 }
 
 // randomHex generates a random hex string of specified byte length
@@ -390,4 +410,81 @@ func extractModelFromJSON(jsonStr string) string {
 		}
 	}
 	return ""
+}
+
+// detectXInitiator determines the X-Initiator value for GitHub Copilot premium request billing.
+// This follows the same logic as OpenCode's copilot-auth implementation:
+//   - "user": The request counts as a premium request (user-initiated message)
+//   - "agent": The request does not consume premium quota (agent/tool-initiated)
+//
+// Detection priority:
+//  1. If client explicitly set X-Initiator header (via opts.Metadata["x_initiator"]), use that
+//  2. Otherwise, auto-detect based on the last message role in the request body:
+//     - If last message role is "tool" or "assistant", use "agent"
+//     - If last message role is "user", use "user"
+//  3. For OpenAI Responses API format (input array), check for agent types
+//  4. Default to "agent" if detection fails (safe default to avoid burning premium requests)
+//
+// See: https://github.com/sst/opencode-copilot-auth/blob/main/index.mjs
+func detectXInitiator(opts cliproxyexecutor.Options, body []byte) string {
+	// Priority 1: Check if client explicitly set X-Initiator header
+	if opts.Metadata != nil {
+		if v, ok := opts.Metadata["x_initiator"].(string); ok {
+			if val := strings.TrimSpace(v); val != "" {
+				return val
+			}
+		}
+	}
+
+	// Priority 2: Auto-detect based on message content (following OpenCode's approach)
+	if len(body) > 0 {
+		// Check standard messages array format
+		messages := gjson.GetBytes(body, "messages")
+		if messages.Exists() && messages.IsArray() {
+			arr := messages.Array()
+			if len(arr) > 0 {
+				lastMessage := arr[len(arr)-1]
+				role := strings.ToLower(lastMessage.Get("role").String())
+				// If last message is from tool or assistant, it's an agent call
+				if role == "tool" || role == "assistant" {
+					return "agent"
+				}
+				// If last message is from user, it's a user-initiated call
+				if role == "user" {
+					return "user"
+				}
+			}
+		}
+
+		// Check OpenAI Responses API format (input array)
+		input := gjson.GetBytes(body, "input")
+		if input.Exists() && input.IsArray() {
+			arr := input.Array()
+			if len(arr) > 0 {
+				lastInput := arr[len(arr)-1]
+				role := strings.ToLower(lastInput.Get("role").String())
+				inputType := strings.ToLower(lastInput.Get("type").String())
+
+				// Check for assistant role
+				if role == "assistant" {
+					return "agent"
+				}
+
+				// Check for agent-specific input types (file_search, computer_call, function_call, etc.)
+				agentTypes := []string{
+					"file_search_call", "computer_call", "computer_call_output",
+					"function_call", "function_call_output", "web_search_call",
+					"reasoning", "mcp_list_tools", "mcp_call_tool", "mcp_call_tool_result",
+				}
+				for _, t := range agentTypes {
+					if inputType == t {
+						return "agent"
+					}
+				}
+			}
+		}
+	}
+
+	// Default to "agent" to avoid burning premium requests unnecessarily
+	return "agent"
 }

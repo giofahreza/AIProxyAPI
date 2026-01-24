@@ -44,6 +44,7 @@ type ErrorDetail struct {
 }
 
 const idempotencyKeyMetadataKey = "idempotency_key"
+const xInitiatorMetadataKey = "x_initiator"
 
 const (
 	defaultStreamingKeepAliveSeconds = 0
@@ -129,15 +130,25 @@ func requestExecutionMetadata(ctx context.Context) map[string]any {
 	// Idempotency-Key is an optional client-supplied header used to correlate retries.
 	// It is forwarded as execution metadata; when absent we generate a UUID.
 	key := ""
+	xInitiator := ""
 	if ctx != nil {
 		if ginCtx, ok := ctx.Value("gin").(*gin.Context); ok && ginCtx != nil && ginCtx.Request != nil {
 			key = strings.TrimSpace(ginCtx.GetHeader("Idempotency-Key"))
+			// X-Initiator header controls GitHub Copilot premium request billing.
+			// When set to "user", the request counts as a premium request.
+			// When set to "agent", the request does not consume premium quota.
+			// See: https://docs.github.com/en/copilot/concepts/billing/copilot-requests
+			xInitiator = strings.TrimSpace(ginCtx.GetHeader("X-Initiator"))
 		}
 	}
 	if key == "" {
 		key = uuid.NewString()
 	}
-	return map[string]any{idempotencyKeyMetadataKey: key}
+	metadata := map[string]any{idempotencyKeyMetadataKey: key}
+	if xInitiator != "" {
+		metadata[xInitiatorMetadataKey] = xInitiator
+	}
+	return metadata
 }
 
 func mergeMetadata(base, overlay map[string]any) map[string]any {
