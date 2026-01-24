@@ -45,11 +45,6 @@ function showError(container, message) {
     container.innerHTML = `<div class="alert alert-error">${escapeHtml(message)}</div>`;
 }
 
-// Confirm dialog
-function confirm(message) {
-    return window.confirm(message);
-}
-
 // Debounce function
 function debounce(func, wait) {
     let timeout;
