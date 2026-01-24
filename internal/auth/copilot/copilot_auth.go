@@ -170,6 +170,55 @@ func (ca *CopilotAuth) PollForGitHubToken(deviceCode string, interval int) (stri
 	return "", fmt.Errorf("authentication timeout. Please restart the authentication process")
 }
 
+// GetGitHubUser fetches the authenticated user's information from GitHub.
+// This is used to get the username/email for identifying the account.
+//
+// Parameters:
+//   - ctx: The context for the request
+//   - githubToken: The GitHub access token (ghu_xxx)
+//
+// Returns:
+//   - *GitHubUserResponse: The user information
+//   - error: An error if the request fails
+func (ca *CopilotAuth) GetGitHubUser(ctx context.Context, githubToken string) (*GitHubUserResponse, error) {
+	if githubToken == "" {
+		return nil, fmt.Errorf("GitHub token is required")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", GitHubUserURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user info request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", githubToken))
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "GitHubCopilotChat/1.0")
+
+	resp, err := ca.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("user info request failed: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read user info response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("user info request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var userResp GitHubUserResponse
+	if err = json.Unmarshal(body, &userResp); err != nil {
+		return nil, fmt.Errorf("failed to parse user info response: %w", err)
+	}
+
+	return &userResp, nil
+}
+
 // ExchangeGitHubTokenForCopilot exchanges a GitHub access token for a Copilot API token.
 // The Copilot token expires approximately every 25 minutes and must be refreshed.
 //
@@ -235,11 +284,26 @@ func (ca *CopilotAuth) RefreshCopilotToken(ctx context.Context, githubToken stri
 		return nil, err
 	}
 
+	// Fetch user info to get username/email for account identification
+	var userIdentifier string
+	userInfo, userErr := ca.GetGitHubUser(ctx, githubToken)
+	if userErr != nil {
+		log.Warnf("Failed to fetch GitHub user info: %v", userErr)
+	} else {
+		// Prefer email if available, otherwise use login (username)
+		if userInfo.Email != "" {
+			userIdentifier = userInfo.Email
+		} else if userInfo.Login != "" {
+			userIdentifier = userInfo.Login
+		}
+	}
+
 	return &CopilotTokenData{
 		GitHubToken:    githubToken,
 		CopilotToken:   copilotResp.Token,
 		CopilotAPIBase: copilotResp.Endpoints.API,
 		CopilotExpire:  time.Unix(copilotResp.ExpiresAt, 0).Format(time.RFC3339),
+		Email:          userIdentifier,
 		SKU:            copilotResp.SKU,
 	}, nil
 }

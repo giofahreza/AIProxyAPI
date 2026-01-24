@@ -64,12 +64,18 @@ function renderAuthFileCard(file) {
     const isRuntime = file.runtime_only || file.runtimeOnly;
     const canReauth = canReauthenticate(fileType);
 
+    // Get account identifier (email, account, or label)
+    const account = file.account || file.email || file.label || '';
+    const status = file.status || '';
+    const statusClass = status === 'error' ? 'text-danger' : (status === 'disabled' ? 'text-muted' : '');
+
     return `
         <div class="file-card">
             <div class="file-info">
                 <span class="file-type ${typeClass}">${escapeHtml(fileType)}</span>
                 <div>
                     <div class="file-name">${escapeHtml(fileName)}</div>
+                    ${account ? `<div class="file-account" style="color: var(--text-secondary); font-size: 0.9em;">Account: ${escapeHtml(account)}${status && statusClass ? ` <span class="${statusClass}">(${status})</span>` : ''}</div>` : ''}
                     <div class="file-meta">Size: ${size} | Modified: ${modified}${isRuntime ? ' | <span class="text-muted">Runtime</span>' : ''}</div>
                 </div>
             </div>
