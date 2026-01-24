@@ -7,7 +7,7 @@ package geminiCLI
 import (
 	"context"
 
-	. "github.com/router-for-me/CLIProxyAPI/v6/internal/translator/claude/gemini"
+	. "github.com/giofahreza/AIProxyAPI/v6/internal/translator/claude/gemini"
 	"github.com/tidwall/sjson"
 )
 

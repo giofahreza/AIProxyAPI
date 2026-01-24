@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
+	cliproxyexecutor "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/executor"
 )
 
 func TestFillFirstSelectorPick_Deterministic(t *testing.T) {

@@ -16,19 +16,19 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	configaccess "github.com/router-for-me/CLIProxyAPI/v6/internal/access/config_access"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/buildinfo"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/cmd"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/managementasset"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/store"
-	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+	configaccess "github.com/giofahreza/AIProxyAPI/v6/internal/access/config_access"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/buildinfo"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/cmd"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/config"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/logging"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/managementasset"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/misc"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/store"
+	_ "github.com/giofahreza/AIProxyAPI/v6/internal/translator"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/usage"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/util"
+	sdkAuth "github.com/giofahreza/AIProxyAPI/v6/sdk/auth"
+	coreauth "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -51,7 +51,7 @@ func init() {
 // It parses command-line flags, loads configuration, and starts the appropriate
 // service based on the provided flags (login, codex-login, or server mode).
 func main() {
-	fmt.Printf("CLIProxyAPI Version: %s, Commit: %s, BuiltAt: %s\n", buildinfo.Version, buildinfo.Commit, buildinfo.BuildDate)
+	fmt.Printf("AIProxyAPI Version: %s, Commit: %s, BuiltAt: %s\n", buildinfo.Version, buildinfo.Commit, buildinfo.BuildDate)
 
 	// Command-line flags to control the application's behavior.
 	var login bool
@@ -412,7 +412,7 @@ func main() {
 		return
 	}
 
-	log.Infof("CLIProxyAPI Version: %s, Commit: %s, BuiltAt: %s", buildinfo.Version, buildinfo.Commit, buildinfo.BuildDate)
+	log.Infof("AIProxyAPI Version: %s, Commit: %s, BuiltAt: %s", buildinfo.Version, buildinfo.Commit, buildinfo.BuildDate)
 
 	// Set the log level based on the configuration.
 	util.SetLogLevel(cfg)

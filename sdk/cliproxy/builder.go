@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/api"
+	sdkaccess "github.com/giofahreza/AIProxyAPI/v6/sdk/access"
+	sdkAuth "github.com/giofahreza/AIProxyAPI/v6/sdk/auth"
+	coreauth "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/auth"
+	"github.com/giofahreza/AIProxyAPI/v6/sdk/config"
 )
 
 // Builder constructs a Service instance with customizable providers.

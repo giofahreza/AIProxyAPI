@@ -92,7 +92,7 @@ async function renderDashboard(container) {
                         <h3 class="section-title">Quick Links</h3>
                     </div>
                     <div class="grid-2 mb-20">
-                        <a href="https://github.com/router-for-me/CLIProxyAPI" target="_blank" class="btn">
+                        <a href="https://github.com/giofahreza/AIProxyAPI" target="_blank" class="btn">
                             Main Repository
                         </a>
                         <a href="https://help.router-for.me/" target="_blank" class="btn">
@@ -267,7 +267,7 @@ async function checkForUpdates(currentVersion) {
             alertDiv.innerHTML = `
                 <div class="alert alert-info">
                     A new version (${escapeHtml(latestVersion)}) is available!
-                    <a href="https://github.com/router-for-me/CLIProxyAPI/releases/latest" target="_blank">View release</a>
+                    <a href="https://github.com/giofahreza/AIProxyAPI/releases/latest" target="_blank">View release</a>
                 </div>
             `;
         }

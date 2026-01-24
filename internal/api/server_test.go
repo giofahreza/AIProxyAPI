@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	gin "github.com/gin-gonic/gin"
-	proxyconfig "github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
+	proxyconfig "github.com/giofahreza/AIProxyAPI/v6/internal/config"
+	sdkaccess "github.com/giofahreza/AIProxyAPI/v6/sdk/access"
+	"github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/auth"
+	sdkconfig "github.com/giofahreza/AIProxyAPI/v6/sdk/config"
 )
 
 func newTestServer(t *testing.T) *Server {

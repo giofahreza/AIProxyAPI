@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/config"
+	coreauth "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/auth"
 )
 
 func TestNewFileSynthesizer(t *testing.T) {

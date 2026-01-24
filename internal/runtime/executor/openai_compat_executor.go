@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/config"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/util"
+	cliproxyauth "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/auth"
+	cliproxyexecutor "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/executor"
+	sdktranslator "github.com/giofahreza/AIProxyAPI/v6/sdk/translator"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/sjson"
 )
@@ -80,7 +80,7 @@ func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *cliproxyauth.A
 	if apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	httpReq.Header.Set("User-Agent", "cli-proxy-openai-compat")
+	httpReq.Header.Set("User-Agent", "ai-proxy-openai-compat")
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -177,7 +177,7 @@ func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *cliproxy
 	if apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	httpReq.Header.Set("User-Agent", "cli-proxy-openai-compat")
+	httpReq.Header.Set("User-Agent", "ai-proxy-openai-compat")
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes

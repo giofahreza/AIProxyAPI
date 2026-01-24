@@ -1,4 +1,4 @@
-# CLIProxyAPI Frontend
+# AIProxyAPI Frontend
 
 Simple, functional management frontend built with vanilla JavaScript, HTML, and CSS.
 
@@ -92,7 +92,7 @@ frontend/
 
 1. **Start the backend:**
    ```bash
-   cd /root/dev/yow/CLIProxyAPI
+   cd /root/dev/yow/AIProxyAPI
    go run ./cmd/server
    ```
 

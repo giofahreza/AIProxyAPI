@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
+	"github.com/giofahreza/AIProxyAPI/v6/sdk/config"
 )
 
 // Provider validates credentials for incoming requests.

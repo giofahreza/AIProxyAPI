@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/cache"
+	"github.com/giofahreza/AIProxyAPI/v6/internal/cache"
 )
 
 // ============================================================================

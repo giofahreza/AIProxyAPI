@@ -18,7 +18,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/plumbing/transport/http"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+	cliproxyauth "github.com/giofahreza/AIProxyAPI/v6/sdk/cliproxy/auth"
 )
 
 // GitTokenStore persists token records and auth metadata using git as the backing storage.
@@ -592,7 +592,7 @@ func (s *GitTokenStore) commitAndPushLocked(message string, relPaths ...string) 
 		message = "Update auth store"
 	}
 	signature := &object.Signature{
-		Name:  "CLIProxyAPI",
+		Name:  "AIProxyAPI",
 		Email: "cliproxy@local",
 		When:  time.Now(),
 	}

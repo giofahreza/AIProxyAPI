@@ -32,11 +32,11 @@ jobs:
       - name: Deploy to server
         run: |
           # Copy binary to server
-          scp -i ~/.ssh/oracle.key cliproxyapi ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/CLIProxyAPI/cliproxyapi.new
+          scp -i ~/.ssh/oracle.key cliproxyapi ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/AIProxyAPI/cliproxyapi.new
 
           # SSH into server and deploy
           ssh -i ~/.ssh/oracle.key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'ENDSSH'
-            cd ~/CLIProxyAPI
+            cd ~/AIProxyAPI
 
             # Pull latest code
             GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch giofahreza
