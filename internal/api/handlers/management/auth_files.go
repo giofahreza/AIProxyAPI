@@ -1788,20 +1788,24 @@ func (h *Handler) RequestCopilotTokenStatus(c *gin.Context) {
 		return
 	}
 
+	log.Infof("GitHub token status response (device_code=%s): %s", deviceCode[:8]+"...", string(body))
+
 	var tokenResp copilot.GitHubTokenResponse
 	if err = json.Unmarshal(body, &tokenResp); err != nil {
+		log.Errorf("Failed to parse GitHub response: %v, body: %s", err, string(body))
 		c.JSON(200, gin.H{"status": "error", "error": "failed to parse response"})
 		return
 	}
 
 	// Check for errors
 	if tokenResp.Error != "" {
+		log.Infof("GitHub token response error: %s - %s", tokenResp.Error, tokenResp.ErrorDescription)
 		switch tokenResp.Error {
 		case "authorization_pending":
-			c.JSON(200, gin.H{"status": "wait"})
+			c.JSON(200, gin.H{"status": "wait", "message": "Waiting for user to authorize on GitHub"})
 			return
 		case "slow_down":
-			c.JSON(200, gin.H{"status": "wait"})
+			c.JSON(200, gin.H{"status": "wait", "message": "Rate limited, please slow down"})
 			return
 		case "expired_token":
 			c.JSON(200, gin.H{"status": "error", "error": "device code expired. Please restart the authentication process"})
@@ -1810,7 +1814,7 @@ func (h *Handler) RequestCopilotTokenStatus(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "error", "error": "authorization denied by user"})
 			return
 		default:
-			c.JSON(200, gin.H{"status": "error", "error": fmt.Sprintf("authentication failed: %s", tokenResp.Error)})
+			c.JSON(200, gin.H{"status": "error", "error": fmt.Sprintf("authentication failed: %s - %s", tokenResp.Error, tokenResp.ErrorDescription)})
 			return
 		}
 	}

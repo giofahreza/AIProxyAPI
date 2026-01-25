@@ -31,20 +31,12 @@ jobs:
 
       - name: Deploy to server
         run: |
-          # Ensure directory exists and copy binary
-          ssh -i ~/.ssh/oracle.key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} "mkdir -p /home/${{ secrets.ORACLE_USER }}/AIProxyAPI"
+          # Copy binary to server
           scp -i ~/.ssh/oracle.key aiproxyapi ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:/home/${{ secrets.ORACLE_USER }}/AIProxyAPI/aiproxyapi.new
 
           # SSH into server and deploy
           ssh -i ~/.ssh/oracle.key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'ENDSSH'
             cd /home/$USER/AIProxyAPI
-
-            # Setup git remote if needed
-            git remote set-url giofahreza git@github.com:giofahreza/AIProxyAPI.git 2>/dev/null || git remote add giofahreza git@github.com:giofahreza/AIProxyAPI.git 2>/dev/null || true
-
-            # Pull latest code
-            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch giofahreza 2>/dev/null || true
-            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git pull giofahreza main 2>/dev/null || true
 
             # Backup and replace binary
             if [ -f aiproxyapi ]; then
@@ -53,12 +45,21 @@ jobs:
             mv aiproxyapi.new aiproxyapi
             chmod +x aiproxyapi
 
+            # Copy frontend files from CLIProxyAPI repo (where git pull happens)
+            cd /home/$USER/CLIProxyAPI
+            git remote set-url giofahreza git@github.com:giofahreza/AIProxyAPI.git 2>/dev/null || git remote add giofahreza git@github.com:giofahreza/AIProxyAPI.git 2>/dev/null || true
+            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch giofahreza 2>/dev/null || true
+            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git pull giofahreza main 2>/dev/null || true
+
+            # Sync frontend to AIProxyAPI
+            cp -r frontend /home/$USER/AIProxyAPI/ 2>/dev/null || true
+
             # Restart service
-            sudo systemctl restart aiproxyapi.service || sudo systemctl restart cliproxyapi.service || true
+            sudo systemctl restart aiproxyapi.service
 
             # Check status
             sleep 2
-            sudo systemctl status aiproxyapi.service --no-pager || sudo systemctl status cliproxyapi.service --no-pager || true
+            sudo systemctl status aiproxyapi.service --no-pager
           ENDSSH
 
       - name: Verify deployment
