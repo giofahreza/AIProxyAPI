@@ -1764,7 +1764,7 @@ func (h *Handler) RequestCopilotTokenStatus(c *gin.Context) {
 	data.Set("device_code", deviceCode)
 	data.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
 
-	req, err := http.NewRequest("POST", copilot.GitHubAccessTokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", copilot.GitHubAccessTokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		c.JSON(200, gin.H{"status": "error", "error": "failed to create request"})
 		return
@@ -1772,8 +1772,11 @@ func (h *Handler) RequestCopilotTokenStatus(c *gin.Context) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// Use proxy-configured HTTP client
+	httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
+	resp, err := httpClient.Do(req)
 	if err != nil {
+		log.Errorf("Failed to check GitHub authorization status: %v", err)
 		c.JSON(200, gin.H{"status": "error", "error": "failed to check authorization status"})
 		return
 	}
@@ -1832,7 +1835,11 @@ func (h *Handler) RequestCopilotTokenStatus(c *gin.Context) {
 	// Create token storage and save
 	tokenStorage := copilotAuth.CreateTokenStorage(copilotTokenData)
 	tokenStorage.GitHubToken = githubToken
-	tokenStorage.Email = fmt.Sprintf("copilot-%d", time.Now().UnixMilli())
+
+	// Use the email/username from GitHub user info if available, otherwise fallback to timestamp
+	if tokenStorage.Email == "" {
+		tokenStorage.Email = fmt.Sprintf("copilot-%d", time.Now().UnixMilli())
+	}
 
 	record := &coreauth.Auth{
 		ID:       fmt.Sprintf("copilot-%s.json", tokenStorage.Email),
