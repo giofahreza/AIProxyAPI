@@ -256,7 +256,8 @@ const API = {
     },
 
     deleteAuthFile(name) {
-        return this.delete('/auth-files', { name });
+        const query = '?' + buildQuery({ name });
+        return this.request('/auth-files' + query, { method: 'DELETE' });
     },
 
     getAuthFileModels(name) {

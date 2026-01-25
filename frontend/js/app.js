@@ -74,8 +74,8 @@ const App = {
         const form = document.getElementById('loginForm');
         const errorDiv = document.getElementById('loginError');
 
-        // Pre-fill from localStorage
-        const savedApiBase = localStorage.getItem('apiBase') || 'http://localhost:8317';
+        // Pre-fill from localStorage or use current origin
+        const savedApiBase = localStorage.getItem('apiBase') || window.location.origin;
         document.getElementById('apiBase').value = savedApiBase;
 
         form.addEventListener('submit', async (e) => {

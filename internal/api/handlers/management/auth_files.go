@@ -239,18 +239,27 @@ func sanitizeAntigravityFileName(email string) string {
 	return fmt.Sprintf("antigravity-%s.json", replacer.Replace(email))
 }
 
-func (h *Handler) managementCallbackURL(path string) (string, error) {
+func (h *Handler) managementCallbackURL(c *gin.Context, path string) (string, error) {
 	if h == nil || h.cfg == nil || h.cfg.Port <= 0 {
 		return "", fmt.Errorf("server port is not configured")
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
+
+	// Try to get the host from the request
+	host := c.Request.Host
+	if host == "" {
+		host = fmt.Sprintf("127.0.0.1:%d", h.cfg.Port)
+	}
+
+	// Determine scheme from request or TLS config
 	scheme := "http"
-	if h.cfg.TLS.Enable {
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" || h.cfg.TLS.Enable {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://127.0.0.1:%d%s", scheme, h.cfg.Port, path), nil
+
+	return fmt.Sprintf("%s://%s%s", scheme, host, path), nil
 }
 
 func (h *Handler) ListAuthFiles(c *gin.Context) {
@@ -838,7 +847,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
 	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/anthropic/callback")
+		targetURL, errTarget := h.managementCallbackURL(c, "/anthropic/callback")
 		if errTarget != nil {
 			log.WithError(errTarget).Error("failed to compute anthropic callback target")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
@@ -1030,7 +1039,7 @@ func (h *Handler) RequestGeminiCLIToken(c *gin.Context) {
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
 	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/google/callback")
+		targetURL, errTarget := h.managementCallbackURL(c, "/google/callback")
 		if errTarget != nil {
 			log.WithError(errTarget).Error("failed to compute gemini callback target")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
@@ -1277,7 +1286,7 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
 	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/codex/callback")
+		targetURL, errTarget := h.managementCallbackURL(c, "/codex/callback")
 		if errTarget != nil {
 			log.WithError(errTarget).Error("failed to compute codex callback target")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
@@ -1467,7 +1476,7 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
 	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/antigravity/callback")
+		targetURL, errTarget := h.managementCallbackURL(c, "/antigravity/callback")
 		if errTarget != nil {
 			log.WithError(errTarget).Error("failed to compute antigravity callback target")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
@@ -1948,7 +1957,7 @@ func (h *Handler) RequestIFlowToken(c *gin.Context) {
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
 	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/iflow/callback")
+		targetURL, errTarget := h.managementCallbackURL(c, "/iflow/callback")
 		if errTarget != nil {
 			log.WithError(errTarget).Error("failed to compute iflow callback target")
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "error": "callback server unavailable"})
