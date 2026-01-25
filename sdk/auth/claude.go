@@ -74,7 +74,9 @@ func (a *ClaudeAuthenticator) Login(ctx context.Context, cfg *config.Config, opt
 
 	authSvc := claude.NewClaudeAuth(cfg)
 
-	authURL, returnedState, err := authSvc.GenerateAuthURL(state, pkceCodes)
+	// For CLI, use localhost callback server
+	redirectURI := fmt.Sprintf("http://localhost:%d/callback", a.CallbackPort)
+	authURL, returnedState, err := authSvc.GenerateAuthURL(redirectURI, state, pkceCodes)
 	if err != nil {
 		return nil, fmt.Errorf("claude authorization url generation failed: %w", err)
 	}
@@ -176,7 +178,7 @@ waitForCallback:
 
 	log.Debug("Claude authorization code received; exchanging for tokens")
 
-	authBundle, err := authSvc.ExchangeCodeForTokens(ctx, result.Code, state, pkceCodes)
+	authBundle, err := authSvc.ExchangeCodeForTokens(ctx, result.Code, redirectURI, state, pkceCodes)
 	if err != nil {
 		return nil, claude.NewAuthenticationError(claude.ErrCodeExchangeFailed, err)
 	}

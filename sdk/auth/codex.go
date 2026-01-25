@@ -74,7 +74,9 @@ func (a *CodexAuthenticator) Login(ctx context.Context, cfg *config.Config, opts
 
 	authSvc := codex.NewCodexAuth(cfg)
 
-	authURL, err := authSvc.GenerateAuthURL(state, pkceCodes)
+	// For CLI, use localhost callback server
+	redirectURI := fmt.Sprintf("http://localhost:%d/auth/callback", a.CallbackPort)
+	authURL, err := authSvc.GenerateAuthURL(redirectURI, state, pkceCodes)
 	if err != nil {
 		return nil, fmt.Errorf("codex authorization url generation failed: %w", err)
 	}
@@ -175,7 +177,7 @@ waitForCallback:
 
 	log.Debug("Codex authorization code received; exchanging for tokens")
 
-	authBundle, err := authSvc.ExchangeCodeForTokens(ctx, result.Code, pkceCodes)
+	authBundle, err := authSvc.ExchangeCodeForTokens(ctx, result.Code, redirectURI, pkceCodes)
 	if err != nil {
 		return nil, codex.NewAuthenticationError(codex.ErrCodeExchangeFailed, err)
 	}

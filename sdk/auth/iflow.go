@@ -64,7 +64,8 @@ func (a *IFlowAuthenticator) Login(ctx context.Context, cfg *config.Config, opts
 		return nil, fmt.Errorf("iflow auth: failed to generate state: %w", err)
 	}
 
-	authURL, redirectURI := authSvc.AuthorizationURL(state, iflow.CallbackPort)
+	redirectURI := fmt.Sprintf("http://localhost:%d/oauth2callback", iflow.CallbackPort)
+	authURL := authSvc.AuthorizationURL(redirectURI, state)
 
 	if !opts.NoBrowser {
 		fmt.Println("Opening browser for iFlow authentication")

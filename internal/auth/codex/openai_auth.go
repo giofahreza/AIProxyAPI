@@ -23,7 +23,6 @@ const (
 	openaiAuthURL  = "https://auth.openai.com/oauth/authorize"
 	openaiTokenURL = "https://auth.openai.com/oauth/token"
 	openaiClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
-	redirectURI    = "http://localhost:1455/auth/callback"
 )
 
 // CodexAuth handles the OpenAI OAuth2 authentication flow.
@@ -44,7 +43,7 @@ func NewCodexAuth(cfg *config.Config) *CodexAuth {
 // GenerateAuthURL creates the OAuth authorization URL with PKCE (Proof Key for Code Exchange).
 // It constructs the URL with the necessary parameters, including the client ID,
 // response type, redirect URI, scopes, and PKCE challenge.
-func (o *CodexAuth) GenerateAuthURL(state string, pkceCodes *PKCECodes) (string, error) {
+func (o *CodexAuth) GenerateAuthURL(redirectURI, state string, pkceCodes *PKCECodes) (string, error) {
 	if pkceCodes == nil {
 		return "", fmt.Errorf("PKCE codes are required")
 	}
@@ -69,7 +68,7 @@ func (o *CodexAuth) GenerateAuthURL(state string, pkceCodes *PKCECodes) (string,
 // ExchangeCodeForTokens exchanges an authorization code for access and refresh tokens.
 // It performs an HTTP POST request to the OpenAI token endpoint with the provided
 // authorization code and PKCE verifier.
-func (o *CodexAuth) ExchangeCodeForTokens(ctx context.Context, code string, pkceCodes *PKCECodes) (*CodexAuthBundle, error) {
+func (o *CodexAuth) ExchangeCodeForTokens(ctx context.Context, code, redirectURI string, pkceCodes *PKCECodes) (*CodexAuthBundle, error) {
 	if pkceCodes == nil {
 		return nil, fmt.Errorf("PKCE codes are required for token exchange")
 	}

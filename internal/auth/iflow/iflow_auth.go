@@ -52,17 +52,16 @@ func NewIFlowAuth(cfg *config.Config) *IFlowAuth {
 	return &IFlowAuth{httpClient: util.SetProxy(&cfg.SDKConfig, client)}
 }
 
-// AuthorizationURL builds the authorization URL and matching redirect URI.
-func (ia *IFlowAuth) AuthorizationURL(state string, port int) (authURL, redirectURI string) {
-	redirectURI = fmt.Sprintf("http://localhost:%d/oauth2callback", port)
+// AuthorizationURL builds the authorization URL with the provided redirect URI.
+func (ia *IFlowAuth) AuthorizationURL(redirectURI, state string) string {
 	values := url.Values{}
 	values.Set("loginMethod", "phone")
 	values.Set("type", "phone")
 	values.Set("redirect", redirectURI)
 	values.Set("state", state)
 	values.Set("client_id", iFlowOAuthClientID)
-	authURL = fmt.Sprintf("%s?%s", iFlowOAuthAuthorizeEndpoint, values.Encode())
-	return authURL, redirectURI
+	authURL := fmt.Sprintf("%s?%s", iFlowOAuthAuthorizeEndpoint, values.Encode())
+	return authURL
 }
 
 // ExchangeCodeForTokens exchanges an authorization code for access and refresh tokens.

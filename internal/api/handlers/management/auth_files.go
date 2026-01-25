@@ -834,8 +834,16 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 	// Initialize Claude auth service
 	anthropicAuth := claude.NewClaudeAuth(h.cfg)
 
-	// Generate authorization URL (then override redirect_uri to reuse server port)
-	authURL, state, err := anthropicAuth.GenerateAuthURL(state, pkceCodes)
+	// Compute actual redirect URI based on request host
+	redirectURI, err := h.managementCallbackURL(c, "/anthropic/callback")
+	if err != nil {
+		log.Errorf("Failed to compute redirect URI: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate redirect uri"})
+		return
+	}
+
+	// Generate authorization URL with actual redirect URI
+	authURL, state, err := anthropicAuth.GenerateAuthURL(redirectURI, state, pkceCodes)
 	if err != nil {
 		log.Errorf("Failed to generate authorization URL: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate authorization url"})
@@ -929,7 +937,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 			"state":         state,
 			"grant_type":    "authorization_code",
 			"client_id":     clientID,
-			"redirect_uri":  "http://localhost:54545/callback",
+			"redirect_uri":  redirectURI,
 			"code_verifier": pkceCodes.CodeVerifier,
 		}
 		bodyJSON, _ := json.Marshal(bodyMap)
@@ -1017,11 +1025,19 @@ func (h *Handler) RequestGeminiCLIToken(c *gin.Context) {
 
 	fmt.Println("Initializing Google authentication...")
 
+	// Compute actual redirect URI based on request host
+	redirectURI, err := h.managementCallbackURL(c, "/google/callback")
+	if err != nil {
+		log.Errorf("Failed to compute redirect URI: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate redirect uri"})
+		return
+	}
+
 	// OAuth2 configuration (mirrors internal/auth/gemini)
 	conf := &oauth2.Config{
 		ClientID:     "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
 		ClientSecret: "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",
-		RedirectURL:  "http://localhost:8085/oauth2callback",
+		RedirectURL:  redirectURI,
 		Scopes: []string{
 			"https://www.googleapis.com/auth/cloud-platform",
 			"https://www.googleapis.com/auth/userinfo.email",
@@ -1273,8 +1289,16 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 	// Initialize Codex auth service
 	openaiAuth := codex.NewCodexAuth(h.cfg)
 
-	// Generate authorization URL
-	authURL, err := openaiAuth.GenerateAuthURL(state, pkceCodes)
+	// Compute actual redirect URI based on request host
+	redirectURI, err := h.managementCallbackURL(c, "/codex/callback")
+	if err != nil {
+		log.Errorf("Failed to compute redirect URI: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate redirect uri"})
+		return
+	}
+
+	// Generate authorization URL with actual redirect URI
+	authURL, err := openaiAuth.GenerateAuthURL(redirectURI, state, pkceCodes)
 	if err != nil {
 		log.Errorf("Failed to generate authorization URL: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate authorization url"})
@@ -1352,7 +1376,7 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 			"grant_type":    {"authorization_code"},
 			"client_id":     {clientID},
 			"code":          {code},
-			"redirect_uri":  {"http://localhost:1455/auth/callback"},
+			"redirect_uri":  {redirectURI},
 			"code_verifier": {pkceCodes.CodeVerifier},
 		}
 		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
@@ -1949,8 +1973,17 @@ func (h *Handler) RequestIFlowToken(c *gin.Context) {
 	fmt.Println("Initializing iFlow authentication...")
 
 	state := fmt.Sprintf("ifl-%d", time.Now().UnixNano())
+
+	// Compute actual redirect URI based on request host
+	redirectURI, err := h.managementCallbackURL(c, "/iflow/callback")
+	if err != nil {
+		log.Errorf("Failed to compute redirect URI: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate redirect uri"})
+		return
+	}
+
 	authSvc := iflowauth.NewIFlowAuth(h.cfg)
-	authURL, redirectURI := authSvc.AuthorizationURL(state, iflowauth.CallbackPort)
+	authURL := authSvc.AuthorizationURL(redirectURI, state)
 
 	RegisterOAuthSession(state, "iflow")
 

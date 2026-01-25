@@ -22,7 +22,6 @@ const (
 	anthropicAuthURL  = "https://claude.ai/oauth/authorize"
 	anthropicTokenURL = "https://console.anthropic.com/v1/oauth/token"
 	anthropicClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-	redirectURI       = "http://localhost:54545/callback"
 )
 
 // tokenResponse represents the response structure from Anthropic's OAuth token endpoint.
@@ -75,7 +74,7 @@ func NewClaudeAuth(cfg *config.Config) *ClaudeAuth {
 //   - string: The complete authorization URL
 //   - string: The state parameter for verification
 //   - error: An error if PKCE codes are missing or URL generation fails
-func (o *ClaudeAuth) GenerateAuthURL(state string, pkceCodes *PKCECodes) (string, string, error) {
+func (o *ClaudeAuth) GenerateAuthURL(redirectURI, state string, pkceCodes *PKCECodes) (string, string, error) {
 	if pkceCodes == nil {
 		return "", "", fmt.Errorf("PKCE codes are required")
 	}
@@ -120,13 +119,14 @@ func (c *ClaudeAuth) parseCodeAndState(code string) (parsedCode, parsedState str
 // Parameters:
 //   - ctx: The context for the request
 //   - code: The authorization code received from OAuth callback
+//   - redirectURI: The redirect URI used in the authorization request
 //   - state: The state parameter for verification
 //   - pkceCodes: The PKCE codes for secure verification
 //
 // Returns:
 //   - *ClaudeAuthBundle: The complete authentication bundle with tokens
 //   - error: An error if token exchange fails
-func (o *ClaudeAuth) ExchangeCodeForTokens(ctx context.Context, code, state string, pkceCodes *PKCECodes) (*ClaudeAuthBundle, error) {
+func (o *ClaudeAuth) ExchangeCodeForTokens(ctx context.Context, code, redirectURI, state string, pkceCodes *PKCECodes) (*ClaudeAuthBundle, error) {
 	if pkceCodes == nil {
 		return nil, fmt.Errorf("PKCE codes are required for token exchange")
 	}
