@@ -441,6 +441,19 @@ func main() {
 		sdkAuth.RegisterTokenStore(sdkAuth.NewFileTokenStore())
 	}
 
+	// Register the usage statistics store for persistence (only if PostgresStore is available).
+	if usePostgresStore && pgStoreInst != nil {
+		usage.RegisterUsageStore(pgStoreInst)
+		// Load existing statistics from database
+		loadCtx, loadCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := usage.LoadStatistics(loadCtx); err != nil {
+			log.WithError(err).Warn("failed to load usage statistics from postgres")
+		} else {
+			log.Info("usage statistics loaded from postgres")
+		}
+		loadCancel()
+	}
+
 	// Register built-in access providers before constructing services.
 	configaccess.Register()
 

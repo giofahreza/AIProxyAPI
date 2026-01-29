@@ -19,6 +19,7 @@ type Record struct {
 	RequestedAt time.Time
 	Failed      bool
 	Detail      Detail
+	UserPrompt  string
 }
 
 // Detail holds the token usage breakdown.

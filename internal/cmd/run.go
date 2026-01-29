@@ -12,6 +12,7 @@ import (
 
 	"github.com/giofahreza/AIProxyAPI/internal/api"
 	"github.com/giofahreza/AIProxyAPI/internal/config"
+	"github.com/giofahreza/AIProxyAPI/internal/usage"
 	"github.com/giofahreza/AIProxyAPI/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,9 +50,27 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 		return
 	}
 
+	// Start periodic saving of usage statistics (every 5 minutes)
+	if usage.GetUsageStore() != nil {
+		usage.StartPeriodicSave(runCtx, 5*time.Minute)
+		log.Info("usage statistics periodic saving started (interval: 5 minutes)")
+		defer usage.StopPeriodicSave()
+	}
+
 	err = service.Run(runCtx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		log.Errorf("proxy service exited with error: %v", err)
+	}
+
+	// Save usage statistics on shutdown
+	if usage.GetUsageStore() != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if saveErr := usage.SaveStatistics(shutdownCtx); saveErr != nil {
+			log.WithError(saveErr).Warn("failed to save usage statistics on shutdown")
+		} else {
+			log.Info("usage statistics saved on shutdown")
+		}
 	}
 }
 

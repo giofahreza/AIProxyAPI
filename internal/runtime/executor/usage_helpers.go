@@ -23,6 +23,7 @@ type usageReporter struct {
 	apiKey      string
 	source      string
 	requestedAt time.Time
+	userPrompt  string
 	once        sync.Once
 }
 
@@ -34,6 +35,7 @@ func newUsageReporter(ctx context.Context, provider, model string, auth *cliprox
 		requestedAt: time.Now(),
 		apiKey:      apiKey,
 		source:      resolveUsageSource(auth, apiKey),
+		userPrompt:  extractUserPromptFromContext(ctx),
 	}
 	if auth != nil {
 		reporter.authID = auth.ID
@@ -83,6 +85,7 @@ func (r *usageReporter) publishWithOutcome(ctx context.Context, detail usage.Det
 			RequestedAt: r.requestedAt,
 			Failed:      failed,
 			Detail:      detail,
+			UserPrompt:  r.userPrompt,
 		})
 	})
 }
@@ -106,6 +109,7 @@ func (r *usageReporter) ensurePublished(ctx context.Context) {
 			RequestedAt: r.requestedAt,
 			Failed:      false,
 			Detail:      usage.Detail{},
+			UserPrompt:  r.userPrompt,
 		})
 	})
 }
@@ -173,6 +177,99 @@ func resolveUsageSource(auth *cliproxyauth.Auth, ctxAPIKey string) string {
 		return trimmed
 	}
 	return ""
+}
+
+// extractUserPromptFromContext extracts the first user message from the request body.
+// It truncates long prompts to 500 characters to avoid database bloat.
+func extractUserPromptFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	ginCtx, ok := ctx.Value("gin").(*gin.Context)
+	if !ok || ginCtx == nil {
+		return ""
+	}
+
+	// Try to get cached request body
+	if body, exists := ginCtx.Get("requestBody"); exists {
+		if bodyBytes, ok := body.([]byte); ok {
+			return extractFirstUserMessage(bodyBytes)
+		}
+	}
+
+	return ""
+}
+
+// extractFirstUserMessage extracts the first user message from request JSON.
+// Supports OpenAI/Claude/Gemini formats. Truncates to 500 chars.
+func extractFirstUserMessage(body []byte) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+
+	// Try OpenAI/Claude format: messages[].content
+	messages := gjson.GetBytes(body, "messages")
+	if messages.Exists() && messages.IsArray() {
+		for _, msg := range messages.Array() {
+			role := msg.Get("role").String()
+			if role == "user" {
+				content := msg.Get("content").String()
+				if content != "" {
+					return truncateString(content, 500)
+				}
+				// Handle array content (e.g., with images)
+				contentArray := msg.Get("content")
+				if contentArray.IsArray() {
+					for _, part := range contentArray.Array() {
+						if part.Get("type").String() == "text" {
+							text := part.Get("text").String()
+							if text != "" {
+								return truncateString(text, 500)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Try Gemini format: contents[].parts[].text
+	contents := gjson.GetBytes(body, "contents")
+	if contents.Exists() && contents.IsArray() {
+		for _, content := range contents.Array() {
+			role := content.Get("role").String()
+			if role == "user" {
+				parts := content.Get("parts")
+				if parts.IsArray() {
+					for _, part := range parts.Array() {
+						text := part.Get("text").String()
+						if text != "" {
+							return truncateString(text, 500)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Try direct prompt field
+	prompt := gjson.GetBytes(body, "prompt").String()
+	if prompt != "" {
+		return truncateString(prompt, 500)
+	}
+
+	return ""
+}
+
+// truncateString truncates a string to maxLen characters, adding "..." if truncated.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func parseCodexUsage(data []byte) (usage.Detail, bool) {

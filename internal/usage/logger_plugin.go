@@ -5,6 +5,7 @@ package usage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	coreusage "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/usage"
+	log "github.com/sirupsen/logrus"
 )
 
 var statisticsEnabled atomic.Bool
@@ -89,11 +91,12 @@ type modelStats struct {
 
 // RequestDetail stores the timestamp and token usage for a single request.
 type RequestDetail struct {
-	Timestamp time.Time  `json:"timestamp"`
-	Source    string     `json:"source"`
-	AuthIndex string     `json:"auth_index"`
-	Tokens    TokenStats `json:"tokens"`
-	Failed    bool       `json:"failed"`
+	Timestamp  time.Time  `json:"timestamp"`
+	Source     string     `json:"source"`
+	AuthIndex  string     `json:"auth_index"`
+	Tokens     TokenStats `json:"tokens"`
+	Failed     bool       `json:"failed"`
+	UserPrompt string     `json:"user_prompt,omitempty"`
 }
 
 // TokenStats captures the token usage breakdown for a request.
@@ -197,11 +200,12 @@ func (s *RequestStatistics) Record(ctx context.Context, record coreusage.Record)
 		s.apis[statsKey] = stats
 	}
 	s.updateAPIStats(stats, modelName, RequestDetail{
-		Timestamp: timestamp,
-		Source:    record.Source,
-		AuthIndex: record.AuthIndex,
-		Tokens:    detail,
-		Failed:    failed,
+		Timestamp:  timestamp,
+		Source:     record.Source,
+		AuthIndex:  record.AuthIndex,
+		Tokens:     detail,
+		Failed:     failed,
+		UserPrompt: record.UserPrompt,
 	})
 
 	s.requestsByDay[dayKey]++
@@ -469,4 +473,123 @@ func formatHour(hour int) string {
 	}
 	hour = hour % 24
 	return fmt.Sprintf("%02d", hour)
+}
+
+// UsageStore defines the interface for persisting usage statistics.
+type UsageStore interface {
+	SaveUsageStatistics(ctx context.Context, data []byte) error
+	LoadUsageStatistics(ctx context.Context) ([]byte, error)
+}
+
+var (
+	globalUsageStore    UsageStore
+	globalUsageStoreMu  sync.RWMutex
+	periodicSaveTicker  *time.Ticker
+	periodicSaveStopCh  chan struct{}
+)
+
+// RegisterUsageStore sets the global usage statistics store.
+func RegisterUsageStore(store UsageStore) {
+	globalUsageStoreMu.Lock()
+	defer globalUsageStoreMu.Unlock()
+	globalUsageStore = store
+}
+
+// GetUsageStore returns the global usage statistics store.
+func GetUsageStore() UsageStore {
+	globalUsageStoreMu.RLock()
+	defer globalUsageStoreMu.RUnlock()
+	return globalUsageStore
+}
+
+// SaveStatistics persists current usage statistics to the store.
+func SaveStatistics(ctx context.Context) error {
+	store := GetUsageStore()
+	if store == nil {
+		return nil // No store configured, skip
+	}
+
+	stats := GetRequestStatistics()
+	if stats == nil {
+		return nil
+	}
+
+	snapshot := stats.Snapshot()
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return fmt.Errorf("marshal usage statistics: %w", err)
+	}
+
+	return store.SaveUsageStatistics(ctx, data)
+}
+
+// LoadStatistics retrieves and merges persisted usage statistics from the store.
+func LoadStatistics(ctx context.Context) error {
+	store := GetUsageStore()
+	if store == nil {
+		return nil // No store configured, skip
+	}
+
+	data, err := store.LoadUsageStatistics(ctx)
+	if err != nil {
+		return fmt.Errorf("load usage statistics: %w", err)
+	}
+	if len(data) == 0 {
+		return nil // No statistics found
+	}
+
+	var snapshot StatisticsSnapshot
+	if err = json.Unmarshal(data, &snapshot); err != nil {
+		return fmt.Errorf("unmarshal usage statistics: %w", err)
+	}
+
+	stats := GetRequestStatistics()
+	if stats == nil {
+		return nil
+	}
+
+	stats.MergeSnapshot(snapshot)
+	return nil
+}
+
+// StartPeriodicSave begins automatic periodic saving of usage statistics.
+func StartPeriodicSave(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 5 * time.Minute // Default to 5 minutes
+	}
+
+	// Stop any existing ticker
+	StopPeriodicSave()
+
+	periodicSaveTicker = time.NewTicker(interval)
+	periodicSaveStopCh = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-periodicSaveTicker.C:
+				saveCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				if err := SaveStatistics(saveCtx); err != nil {
+					log.WithError(err).Warn("failed to save usage statistics periodically")
+				}
+				cancel()
+			case <-periodicSaveStopCh:
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// StopPeriodicSave stops the automatic periodic saving of usage statistics.
+func StopPeriodicSave() {
+	if periodicSaveTicker != nil {
+		periodicSaveTicker.Stop()
+		periodicSaveTicker = nil
+	}
+	if periodicSaveStopCh != nil {
+		close(periodicSaveStopCh)
+		periodicSaveStopCh = nil
+	}
 }
