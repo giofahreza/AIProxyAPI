@@ -79,7 +79,7 @@ auth:
       sdk: github.com/acme/xplatform/sdk/access/providers/partner
       config:
         region: us-west-2
-        audience: cli-proxy
+        audience: ai-proxy
 ```
 
 ```go

@@ -62,6 +62,12 @@ function renderAuthFileCard(file) {
     const modified = formatDate(file.modtime || file.modified_time || file.modified);
     const size = file.size ? formatFileSize(file.size) : '-';
     const isRuntime = file.runtime_only || file.runtimeOnly;
+    const canReauth = canReauthenticate(fileType);
+
+    // Get account identifier (email, account, or label)
+    const account = file.account || file.email || file.label || '';
+    const status = file.status || '';
+    const statusClass = status === 'error' ? 'text-danger' : (status === 'disabled' ? 'text-muted' : '');
 
     return `
         <div class="file-card">
@@ -69,15 +75,18 @@ function renderAuthFileCard(file) {
                 <span class="file-type ${typeClass}">${escapeHtml(fileType)}</span>
                 <div>
                     <div class="file-name">${escapeHtml(fileName)}</div>
+                    ${account ? `<div class="file-account" style="color: var(--text-secondary); font-size: 0.9em;">Account: ${escapeHtml(account)}${status && statusClass ? ` <span class="${statusClass}">(${status})</span>` : ''}</div>` : ''}
                     <div class="file-meta">Size: ${size} | Modified: ${modified}${isRuntime ? ' | <span class="text-muted">Runtime</span>' : ''}</div>
                 </div>
             </div>
             <div class="file-actions">
                 ${!isRuntime ? `
+                    ${canReauth ? `<button class="btn btn-primary btn-sm" onclick="reAuthenticate('${escapeHtml(fileType)}', '${escapeHtml(fileName)}')">Re-authenticate</button>` : ''}
                     <button class="btn btn-secondary btn-sm" onclick="viewAuthFileModels('${escapeHtml(fileName)}')">Models</button>
                     <button class="btn btn-secondary btn-sm" onclick="downloadAuthFile('${escapeHtml(fileName)}')">Download</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteAuthFile('${escapeHtml(fileName)}')">Delete</button>
                 ` : `
+                    ${canReauth ? `<button class="btn btn-primary btn-sm" onclick="reAuthenticate('${escapeHtml(fileType)}', '${escapeHtml(fileName)}')">Re-authenticate</button>` : ''}
                     <button class="btn btn-secondary btn-sm" onclick="viewAuthFileModels('${escapeHtml(fileName)}')">Models</button>
                     <span class="badge badge-info">Virtual</span>
                 `}
@@ -216,4 +225,204 @@ async function deleteAuthFile(filename) {
     } catch (error) {
         showAlert('Failed to delete: ' + error.message, 'error');
     }
+}
+
+// Check if a provider type supports re-authentication
+function canReauthenticate(fileType) {
+    const normalizedType = (fileType || '').toLowerCase();
+    const supportedProviders = ['copilot', 'claude', 'codex', 'gemini', 'gemini-cli', 'antigravity', 'qwen'];
+    return supportedProviders.some(p => normalizedType.includes(p));
+}
+
+// Re-authenticate an auth file by starting the appropriate OAuth flow
+async function reAuthenticate(fileType, fileName) {
+    const normalizedType = (fileType || '').toLowerCase();
+
+    // Show confirmation (use window.confirm to avoid recursion with custom confirm wrapper)
+    if (!window.confirm(`Re-authenticate ${fileName}?\n\nThis will start a new OAuth flow for ${fileType}.`)) {
+        return;
+    }
+
+    try {
+        if (normalizedType.includes('copilot')) {
+            await startCopilotReauth();
+        } else if (normalizedType.includes('claude') || normalizedType === 'anthropic') {
+            await startProviderReauth('anthropic', 'Anthropic');
+        } else if (normalizedType.includes('codex')) {
+            await startProviderReauth('codex', 'Codex');
+        } else if (normalizedType.includes('gemini')) {
+            await startGeminiReauth();
+        } else if (normalizedType.includes('antigravity')) {
+            await startProviderReauth('antigravity', 'Antigravity');
+        } else if (normalizedType.includes('qwen')) {
+            await startProviderReauth('qwen', 'Qwen');
+        } else {
+            showAlert(`Re-authentication not supported for ${fileType}`, 'warning');
+        }
+    } catch (error) {
+        showAlert('Failed to start re-authentication: ' + error.message, 'error');
+    }
+}
+
+// Start Copilot re-authentication with modal
+async function startCopilotReauth() {
+    try {
+        const response = await API.requestCopilotAuth();
+
+        if (response.device_code && response.verification_uri) {
+            const userCode = response.user_code;
+            const verificationUri = response.verification_uri;
+            const deviceCode = response.device_code;
+            const expiresIn = response.expires_in || 900;
+            const interval = response.interval || 5;
+
+            // Show modal with device code
+            showModal('GitHub Copilot Re-authentication', `
+                <div class="device-code-box" style="text-align: center; padding: 20px;">
+                    <div class="device-code-hint" style="margin-bottom: 10px;">Enter this code at GitHub:</div>
+                    <div class="device-code" style="font-size: 32px; font-weight: bold; letter-spacing: 4px; padding: 20px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 20px;">${escapeHtml(userCode)}</div>
+                    <div style="margin-bottom: 20px;">
+                        <a href="${escapeHtml(verificationUri)}" target="_blank" class="btn">Open GitHub</a>
+                        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText('${escapeHtml(userCode)}'); showAlert('Code copied!', 'success')">Copy Code</button>
+                    </div>
+                    <div id="copilotReauthStatus" class="oauth-status waiting">
+                        Waiting for authentication... (expires in ${Math.floor(expiresIn / 60)} minutes)
+                    </div>
+                </div>
+            `);
+
+            // Start polling
+            let pollCount = 0;
+            const maxPolls = Math.floor(expiresIn / interval);
+
+            const pollInterval = setInterval(async () => {
+                pollCount++;
+
+                if (pollCount > maxPolls) {
+                    clearInterval(pollInterval);
+                    const statusEl = document.getElementById('copilotReauthStatus');
+                    if (statusEl) {
+                        statusEl.className = 'oauth-status error';
+                        statusEl.textContent = 'Authentication timed out. Please close and try again.';
+                    }
+                    return;
+                }
+
+                try {
+                    const status = await API.getCopilotTokenStatus(deviceCode);
+
+                    if (status.status === 'ok') {
+                        clearInterval(pollInterval);
+                        const statusEl = document.getElementById('copilotReauthStatus');
+                        if (statusEl) {
+                            statusEl.className = 'oauth-status success';
+                            statusEl.textContent = 'Authentication successful!';
+                        }
+                        showAlert('GitHub Copilot re-authentication successful!', 'success');
+                        setTimeout(() => {
+                            closeModal();
+                            renderAuthFiles(document.getElementById('pageContent'));
+                        }, 1500);
+                    } else if (status.status === 'error') {
+                        clearInterval(pollInterval);
+                        const statusEl = document.getElementById('copilotReauthStatus');
+                        if (statusEl) {
+                            statusEl.className = 'oauth-status error';
+                            statusEl.textContent = status.error || 'Authentication failed. Please try again.';
+                        }
+                    } else {
+                        const statusEl = document.getElementById('copilotReauthStatus');
+                        if (statusEl) {
+                            statusEl.textContent = `Waiting for authentication... (${Math.floor((expiresIn - pollCount * interval) / 60)} min remaining)`;
+                        }
+                    }
+                } catch (pollError) {
+                    console.error('Copilot reauth poll error:', pollError);
+                }
+            }, interval * 1000);
+
+        } else {
+            showAlert('Failed to start Copilot authentication: No device code received', 'error');
+        }
+    } catch (error) {
+        showAlert('Failed to start Copilot re-authentication: ' + error.message, 'error');
+    }
+}
+
+// Start provider re-authentication (Anthropic, Codex, Antigravity, Qwen)
+async function startProviderReauth(provider, displayName) {
+    try {
+        let response;
+        if (provider === 'anthropic') response = await API.requestAnthropicAuth();
+        else if (provider === 'codex') response = await API.requestCodexAuth();
+        else if (provider === 'antigravity') response = await API.requestAntigravityAuth();
+        else if (provider === 'qwen') response = await API.requestQwenAuth();
+
+        if (response && response.url) {
+            window.open(response.url, '_blank');
+            showAlert(`${displayName} re-authentication started. Please complete in the new window.`, 'info');
+
+            if (response.state) {
+                pollReauthStatus(response.state, displayName);
+            }
+        } else {
+            showAlert(`Failed to start ${displayName} re-authentication: No URL received`, 'error');
+        }
+    } catch (error) {
+        showAlert(`Failed to start ${displayName} re-authentication: ` + error.message, 'error');
+    }
+}
+
+// Start Gemini re-authentication
+async function startGeminiReauth() {
+    try {
+        const response = await API.requestGeminiAuth();
+
+        if (response && response.url) {
+            window.open(response.url, '_blank');
+            showAlert('Gemini re-authentication started. Please complete in the new window.', 'info');
+
+            if (response.state) {
+                pollReauthStatus(response.state, 'Gemini');
+            }
+        } else {
+            showAlert('Failed to start Gemini re-authentication: No URL received', 'error');
+        }
+    } catch (error) {
+        showAlert('Failed to start Gemini re-authentication: ' + error.message, 'error');
+    }
+}
+
+// Poll for re-authentication status
+async function pollReauthStatus(state, providerName) {
+    const maxAttempts = 60;
+    let attempts = 0;
+
+    const poll = async () => {
+        attempts++;
+        try {
+            const status = await API.getAuthStatus(state);
+            if (status.status === 'ok') {
+                showAlert(`${providerName} re-authentication successful!`, 'success');
+                renderAuthFiles(document.getElementById('pageContent'));
+                return;
+            } else if (status.status === 'error') {
+                showAlert(`${providerName} re-authentication failed: ` + (status.error || 'Unknown error'), 'error');
+                return;
+            }
+
+            if (attempts < maxAttempts) {
+                setTimeout(poll, 2000);
+            } else {
+                showAlert(`${providerName} re-authentication timed out`, 'warning');
+            }
+        } catch (error) {
+            console.error('Reauth poll error:', error);
+            if (attempts < maxAttempts) {
+                setTimeout(poll, 2000);
+            }
+        }
+    };
+
+    poll();
 }

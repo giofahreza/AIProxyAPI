@@ -8,6 +8,8 @@ const (
 	GitHubAccessTokenURL = "https://github.com/login/oauth/access_token"
 	// GitHubCopilotTokenURL is the URL for exchanging GitHub tokens for Copilot tokens.
 	GitHubCopilotTokenURL = "https://api.github.com/copilot_internal/v2/token"
+	// GitHubUserURL is the URL for fetching authenticated user information.
+	GitHubUserURL = "https://api.github.com/user"
 	// GitHubClientID is the official GitHub Copilot Client ID.
 	GitHubClientID = "Iv1.b507a08c87ecfe98"
 	// GitHubScope defines the permissions requested by the application.
@@ -74,8 +76,20 @@ type CopilotTokenData struct {
 	CopilotAPIBase string `json:"copilot_api_base"`
 	// CopilotExpire is the timestamp when the Copilot token expires.
 	CopilotExpire string `json:"copilot_expire"`
-	// Email is the GitHub account email.
+	// Email is the GitHub account email or username.
 	Email string `json:"email,omitempty"`
 	// SKU is the subscription type.
 	SKU string `json:"sku,omitempty"`
+}
+
+// GitHubUserResponse represents the response from GitHub's user API endpoint.
+type GitHubUserResponse struct {
+	// Login is the GitHub username.
+	Login string `json:"login"`
+	// Email is the user's public email address (may be empty if private).
+	Email string `json:"email"`
+	// Name is the user's display name.
+	Name string `json:"name"`
+	// ID is the unique GitHub user ID.
+	ID int64 `json:"id"`
 }

@@ -12,10 +12,35 @@ function showAlert(message, type = 'info') {
     setTimeout(() => alertDiv.remove(), 5000);
 }
 
-// Format date
+// Format date - handles both Unix timestamps and ISO 8601 strings
 function formatDate(timestamp) {
     if (!timestamp) return 'Unknown';
-    const date = new Date(timestamp * 1000);
+
+    let date;
+
+    // Check if it's a string (ISO 8601 format like "2025-01-24T23:29:16Z")
+    if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+    }
+    // Check if it's a number (Unix timestamp in seconds or milliseconds)
+    else if (typeof timestamp === 'number') {
+        // If timestamp is less than a reasonable millisecond value, assume it's seconds
+        if (timestamp < 10000000000) {
+            date = new Date(timestamp * 1000);
+        } else {
+            date = new Date(timestamp);
+        }
+    }
+    // Handle Date objects or other formats
+    else {
+        date = new Date(timestamp);
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        return 'Unknown';
+    }
+
     return date.toLocaleString();
 }
 
@@ -43,11 +68,6 @@ function showLoading(container) {
 // Show error state
 function showError(container, message) {
     container.innerHTML = `<div class="alert alert-error">${escapeHtml(message)}</div>`;
-}
-
-// Confirm dialog
-function confirm(message) {
-    return window.confirm(message);
 }
 
 // Debounce function

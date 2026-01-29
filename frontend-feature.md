@@ -1,10 +1,10 @@
  ⎿  Read 100 lines
 
-● Read(~/dev/yow/Cli-Proxy-API-Management-Cen
+● Read(~/dev/yow/Ai-Proxy-API-Management-Cen
       ter/src/services/api/oauth.ts)
   ⎿  Read 90 lines
 
-● Read(~/dev/yow/Cli-Proxy-API-Management-Cen
+● Read(~/dev/yow/Ai-Proxy-API-Management-Cen
       ter/src/services/api/ampcode.ts)
   ⎿  Read 38 lines
 
