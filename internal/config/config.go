@@ -100,6 +100,9 @@ type Config struct {
 	// Payload defines default and override rules for provider payload parameters.
 	Payload PayloadConfig `yaml:"payload" json:"payload"`
 
+	// APIKeyLimits defines per-API-key model restrictions and monthly request quotas.
+	APIKeyLimits []APIKeyLimit `yaml:"api-key-limits,omitempty" json:"api-key-limits,omitempty"`
+
 	legacyMigrationPending bool `yaml:"-" json:"-"`
 }
 
@@ -111,6 +114,22 @@ type TLSConfig struct {
 	Cert string `yaml:"cert" json:"cert"`
 	// Key is the path to the TLS private key file.
 	Key string `yaml:"key" json:"key"`
+}
+
+// APIKeyLimit defines model access restrictions and monthly quotas for a specific API key.
+type APIKeyLimit struct {
+	// APIKey is the API key these restrictions apply to.
+	APIKey string `yaml:"api-key" json:"api-key"`
+
+	// AllowedModels lists the models this API key can access.
+	// If empty or nil, all models are allowed (unless monthly quotas restrict access).
+	// Supports wildcard patterns (e.g., "gpt-*", "claude-*").
+	AllowedModels []string `yaml:"allowed-models,omitempty" json:"allowed-models,omitempty"`
+
+	// MonthlyQuotas defines the maximum number of requests per model per month.
+	// The key is the model name (supports wildcards), and the value is the monthly request limit.
+	// If empty or nil, no quota limits are enforced.
+	MonthlyQuotas map[string]int `yaml:"monthly-quotas,omitempty" json:"monthly-quotas,omitempty"`
 }
 
 // RemoteManagement holds management API configuration under 'remote-management'.
@@ -495,6 +514,9 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// Normalize global OAuth model name mappings.
 	cfg.SanitizeOAuthModelMappings()
 
+	// Normalize API key limits configuration.
+	cfg.SanitizeAPIKeyLimits()
+
 	if cfg.legacyMigrationPending {
 		fmt.Println("Detected legacy configuration keys, attempting to persist the normalized config...")
 		if !optional && configFile != "" {
@@ -553,6 +575,67 @@ func (cfg *Config) SanitizeOAuthModelMappings() {
 		}
 	}
 	cfg.OAuthModelMappings = out
+}
+
+// SanitizeAPIKeyLimits normalizes API key limit configurations by trimming whitespace,
+// deduplicating entries, and validating quota values.
+func (cfg *Config) SanitizeAPIKeyLimits() {
+	if cfg == nil || len(cfg.APIKeyLimits) == 0 {
+		return
+	}
+	seen := make(map[string]struct{}, len(cfg.APIKeyLimits))
+	out := make([]APIKeyLimit, 0, len(cfg.APIKeyLimits))
+
+	for _, limit := range cfg.APIKeyLimits {
+		// Trim and validate API key
+		apiKey := strings.TrimSpace(limit.APIKey)
+		if apiKey == "" {
+			continue
+		}
+
+		// Skip duplicate API keys
+		if _, exists := seen[apiKey]; exists {
+			continue
+		}
+		seen[apiKey] = struct{}{}
+
+		// Normalize allowed models
+		allowedModels := make([]string, 0, len(limit.AllowedModels))
+		seenModels := make(map[string]struct{})
+		for _, model := range limit.AllowedModels {
+			m := strings.TrimSpace(model)
+			if m == "" {
+				continue
+			}
+			mLower := strings.ToLower(m)
+			if _, exists := seenModels[mLower]; exists {
+				continue
+			}
+			seenModels[mLower] = struct{}{}
+			allowedModels = append(allowedModels, m)
+		}
+
+		// Normalize monthly quotas
+		quotas := make(map[string]int)
+		for model, quota := range limit.MonthlyQuotas {
+			m := strings.TrimSpace(model)
+			if m == "" || quota <= 0 {
+				continue
+			}
+			quotas[m] = quota
+		}
+
+		// Only add if there are restrictions or quotas
+		if len(allowedModels) > 0 || len(quotas) > 0 {
+			out = append(out, APIKeyLimit{
+				APIKey:        apiKey,
+				AllowedModels: allowedModels,
+				MonthlyQuotas: quotas,
+			})
+		}
+	}
+
+	cfg.APIKeyLimits = out
 }
 
 // SanitizeOpenAICompatibility removes OpenAI-compatibility provider entries that are

@@ -593,3 +593,77 @@ func StopPeriodicSave() {
 		periodicSaveStopCh = nil
 	}
 }
+
+// GetMonthlyUsage returns the number of requests made by an API key for a specific model
+// in the current month.
+func (s *RequestStatistics) GetMonthlyUsage(apiKey, modelName string) int64 {
+	if s == nil {
+		return 0
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	stats, ok := s.apis[apiKey]
+	if !ok || stats == nil {
+		return 0
+	}
+
+	modelStatsValue, ok := stats.Models[modelName]
+	if !ok || modelStatsValue == nil {
+		return 0
+	}
+
+	// Get current year and month
+	now := time.Now()
+	currentYear := now.Year()
+	currentMonth := now.Month()
+
+	// Count requests in the current month
+	var count int64
+	for _, detail := range modelStatsValue.Details {
+		if detail.Timestamp.Year() == currentYear && detail.Timestamp.Month() == currentMonth {
+			count++
+		}
+	}
+
+	return count
+}
+
+// GetMonthlyUsageAllModels returns a map of model names to request counts for the current month
+// for a specific API key.
+func (s *RequestStatistics) GetMonthlyUsageAllModels(apiKey string) map[string]int64 {
+	if s == nil {
+		return make(map[string]int64)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	stats, ok := s.apis[apiKey]
+	if !ok || stats == nil {
+		return make(map[string]int64)
+	}
+
+	now := time.Now()
+	currentYear := now.Year()
+	currentMonth := now.Month()
+
+	result := make(map[string]int64)
+	for modelName, modelStatsValue := range stats.Models {
+		if modelStatsValue == nil {
+			continue
+		}
+		var count int64
+		for _, detail := range modelStatsValue.Details {
+			if detail.Timestamp.Year() == currentYear && detail.Timestamp.Month() == currentMonth {
+				count++
+			}
+		}
+		if count > 0 {
+			result[modelName] = count
+		}
+	}
+
+	return result
+}

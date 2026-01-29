@@ -149,6 +149,23 @@ const API = {
         return this.delete('/api-keys?' + buildQuery({ value: key }));
     },
 
+    // === API Key Limits ===
+    getAPIKeyLimits() {
+        return this.get('/api-key-limits');
+    },
+
+    updateAPIKeyLimits(limits) {
+        return this.put('/api-key-limits', { api_key_limits: limits });
+    },
+
+    addOrUpdateAPIKeyLimit(limit) {
+        return this.patch('/api-key-limits', limit);
+    },
+
+    deleteAPIKeyLimit(apiKey) {
+        return this.delete('/api-key-limits?' + buildQuery({ api_key: apiKey }));
+    },
+
     // === AI Providers ===
     // API returns {"gemini-api-key": [...]} - extract the array
     async getGeminiKeys() {

@@ -1,0 +1,59 @@
+# Example configuration demonstrating API key limits and monthly quotas
+#
+# This configuration shows how to restrict which models each API key can access
+# and set monthly request quotas per model per API key.
+
+# Server settings
+port: 8080
+debug: false
+
+# API keys for client authentication
+api-keys:
+  - sk-test-key-1
+  - sk-test-key-2
+  - sk-test-key-3
+
+# API key limits configuration
+# This section defines model restrictions and monthly quotas for each API key
+api-key-limits:
+  # Example 1: Restrict to specific models only
+  - api-key: sk-test-key-1
+    allowed-models:
+      - gpt-4
+      - gpt-3.5-turbo
+      - claude-sonnet-4
+    monthly-quotas:
+      gpt-4: 1000           # 1000 requests per month for GPT-4
+      gpt-3.5-turbo: 5000   # 5000 requests per month for GPT-3.5
+      claude-sonnet-4: 2000 # 2000 requests per month for Claude Sonnet
+
+  # Example 2: Allow all models but set quotas
+  - api-key: sk-test-key-2
+    # No allowed-models specified = all models allowed
+    monthly-quotas:
+      gpt-*: 10000          # 10000 requests per month for all GPT models (wildcard)
+      claude-*: 5000        # 5000 requests per month for all Claude models (wildcard)
+
+  # Example 3: Wildcard patterns for model restrictions
+  - api-key: sk-test-key-3
+    allowed-models:
+      - gpt-*               # All GPT models allowed
+      - claude-haiku-*      # Only Claude Haiku models allowed
+    monthly-quotas:
+      gpt-4*: 500           # 500 requests per month for GPT-4 variants
+      gpt-3*: 2000          # 2000 requests per month for GPT-3 variants
+      claude-haiku-*: 10000 # 10000 requests per month for Claude Haiku models
+
+# Gemini API keys (example provider configuration)
+gemini-api-key:
+  - api-key: your-gemini-key-here
+
+# Claude API keys (example provider configuration)
+claude-api-key:
+  - api-key: your-claude-key-here
+
+# Usage statistics settings
+usage-statistics-enabled: true
+
+# Request logging
+request-log: true

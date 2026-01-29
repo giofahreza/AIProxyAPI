@@ -189,6 +189,9 @@ const App = {
             case 'api-keys':
                 renderAPIKeys(container);
                 break;
+            case 'api-key-limits':
+                renderAPIKeyLimits(container);
+                break;
             case 'providers':
                 renderProviders(container);
                 break;

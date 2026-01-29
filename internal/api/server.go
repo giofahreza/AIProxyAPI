@@ -24,6 +24,7 @@ import (
 	"github.com/giofahreza/AIProxyAPI/internal/api/modules"
 	ampmodule "github.com/giofahreza/AIProxyAPI/internal/api/modules/amp"
 	"github.com/giofahreza/AIProxyAPI/internal/config"
+	"github.com/giofahreza/AIProxyAPI/internal/limits"
 	"github.com/giofahreza/AIProxyAPI/internal/logging"
 	"github.com/giofahreza/AIProxyAPI/internal/managementasset"
 	"github.com/giofahreza/AIProxyAPI/internal/usage"
@@ -132,6 +133,9 @@ type Server struct {
 	// accessManager handles request authentication providers.
 	accessManager *sdkaccess.Manager
 
+	// limitsEnforcer validates API key model restrictions and monthly quotas.
+	limitsEnforcer *limits.Enforcer
+
 	// requestLogger is the request logger instance for dynamic configuration updates.
 	requestLogger logging.RequestLogger
 	loggerToggle  func(bool)
@@ -238,6 +242,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		handlers:            handlers.NewBaseAPIHandlers(&cfg.SDKConfig, authManager),
 		cfg:                 cfg,
 		accessManager:       accessManager,
+		limitsEnforcer:      limits.NewEnforcer(cfg.APIKeyLimits),
 		requestLogger:       requestLogger,
 		loggerToggle:        toggle,
 		configFilePath:      configFilePath,
@@ -323,6 +328,7 @@ func (s *Server) setupRoutes() {
 	// OpenAI compatible API routes
 	v1 := s.engine.Group("/v1")
 	v1.Use(AuthMiddleware(s.accessManager))
+	v1.Use(middleware.LimitsMiddleware(s.limitsEnforcer))
 	{
 		v1.GET("/models", s.unifiedModelsHandler(openaiHandlers, claudeCodeHandlers))
 		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
@@ -335,6 +341,7 @@ func (s *Server) setupRoutes() {
 	// Gemini compatible API routes
 	v1beta := s.engine.Group("/v1beta")
 	v1beta.Use(AuthMiddleware(s.accessManager))
+	v1beta.Use(middleware.LimitsMiddleware(s.limitsEnforcer))
 	{
 		v1beta.GET("/models", geminiHandlers.GeminiModels)
 		v1beta.POST("/models/*action", geminiHandlers.GeminiHandler)
@@ -523,6 +530,11 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PUT("/api-keys", s.mgmt.PutAPIKeys)
 		mgmt.PATCH("/api-keys", s.mgmt.PatchAPIKeys)
 		mgmt.DELETE("/api-keys", s.mgmt.DeleteAPIKeys)
+
+		mgmt.GET("/api-key-limits", s.mgmt.GetAPIKeyLimits)
+		mgmt.PUT("/api-key-limits", s.mgmt.PutAPIKeyLimits)
+		mgmt.PATCH("/api-key-limits", s.mgmt.PatchAPIKeyLimit)
+		mgmt.DELETE("/api-key-limits", s.mgmt.DeleteAPIKeyLimit)
 
 		mgmt.GET("/gemini-api-key", s.mgmt.GetGeminiKeys)
 		mgmt.PUT("/gemini-api-key", s.mgmt.PutGeminiKeys)
@@ -975,6 +987,13 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	}
 
 	s.applyAccessConfig(oldCfg, cfg)
+
+	// Reload API key limits enforcer
+	if s.limitsEnforcer != nil {
+		s.limitsEnforcer.Reload(cfg.APIKeyLimits)
+		log.Debug("API key limits reloaded")
+	}
+
 	s.cfg = cfg
 	s.wsAuthEnabled.Store(cfg.WebsocketAuth)
 	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
