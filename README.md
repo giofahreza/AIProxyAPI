@@ -2,119 +2,446 @@
 
 > **Note:** This project is a fork of [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 
-A proxy server that provides OpenAI/Gemini/Claude/Codex compatible API interfaces for CLI.
+## What is AIProxyAPI?
 
-It supports OpenAI Codex (GPT models), Claude Code, Gemini, and more via OAuth.
+**AIProxyAPI** is a unified API gateway that lets you access multiple AI providers (Claude, Gemini, OpenAI Codex, and more) through a single, OpenAI-compatible interface. Think of it as a "reverse proxy for AI APIs" that handles authentication, load balancing, and protocol translation automatically.
 
-Use local or multi-account CLI access with OpenAI (including Responses)/Gemini/Claude-compatible clients and SDKs.
+## Why Use AIProxyAPI?
 
-## Overview
+### 🎯 **One API for All Providers**
+Write your code once using OpenAI's API format, then switch between Claude, Gemini, or other providers by just changing the model name. No code changes needed.
 
-- OpenAI/Gemini/Claude compatible API endpoints for CLI models
-- OpenAI Codex support (GPT models) via OAuth login
-- Claude Code support via OAuth login
-- Qwen Code support via OAuth login
-- iFlow support via OAuth login
-- Amp CLI and IDE extensions support with provider routing
-- Streaming and non-streaming responses
-- Function calling/tools support
-- Multimodal input support (text and images)
-- Multiple accounts with round-robin load balancing (Gemini, OpenAI, Claude, Qwen and iFlow)
-- Simple CLI authentication flows (Gemini, OpenAI, Claude, Qwen and iFlow)
-- Generative Language API Key support
-- AI Studio Build multi-account load balancing
-- Gemini CLI multi-account load balancing
-- Claude Code multi-account load balancing
-- Qwen Code multi-account load balancing
-- iFlow multi-account load balancing
-- OpenAI Codex multi-account load balancing
-- OpenAI-compatible upstream providers via config (e.g., OpenRouter)
-- Reusable Go SDK for embedding the proxy (see `docs/sdk-usage.md`)
+### 🔄 **Automatic Load Balancing**
+Add multiple API keys or OAuth accounts, and AIProxyAPI automatically rotates between them. When one hits rate limits, it switches to the next available credential.
 
-## Getting Started
+### 🔐 **Centralized Authentication**
+Manage all your AI provider credentials in one place. Your applications never see the actual API keys - they just authenticate to the proxy.
 
-AIProxyAPI Guides: [https://help.router-for.me/](https://help.router-for.me/)
+### 📊 **Usage Tracking**
+Built-in usage statistics track token consumption across all providers, models, and API keys. See exactly where your AI costs are going.
 
-## Management API
+### 🌐 **Multi-Provider Support**
+- **Gemini**: Google's Gemini models (AI Studio, Vertex AI, CLI)
+- **Claude**: Anthropic's Claude models (API keys and OAuth)
+- **OpenAI Codex**: GPT models via OAuth
+- **Qwen**: Alibaba's Qwen Code models
+- **GitHub Copilot**: Copilot models integration
+- **iFlow**: Flow-based AI models
+- **Custom Providers**: Any OpenAI-compatible API endpoint
 
-see [MANAGEMENT_API.md](https://help.router-for.me/management/api)
+## Key Features
 
-## Amp CLI Support
+### 🚀 **Easy Setup**
+```bash
+# Start the server
+./aiproxyapi --config config.yaml
 
-AIProxyAPI includes integrated support for [Amp CLI](https://ampcode.com) and Amp IDE extensions, enabling you to use your Google/ChatGPT/Claude OAuth subscriptions with Amp's coding tools:
+# Use with any OpenAI client
+curl http://localhost:8317/v1/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
 
-- Provider route aliases for Amp's API patterns (`/api/provider/{provider}/v1...`)
-- Management proxy for OAuth authentication and account features
-- Smart model fallback with automatic routing
-- **Model mapping** to route unavailable models to alternatives (e.g., `claude-opus-4.5` → `claude-sonnet-4`)
-- Security-first design with localhost-only management endpoints
+### 🔧 **Advanced Features**
+- **Protocol Translation**: OpenAI ↔ Gemini ↔ Claude format conversion
+- **Model Aliasing**: Map model names (e.g., `gpt-latest` → `claude-sonnet-4`)
+- **Quota Management**: Automatic failover when quotas are exceeded
+- **Hot Reload**: Update config without restarting the server
+- **Web Control Panel**: Manage credentials and view usage via browser
+- **Multiple Storage Backends**: File-based, PostgreSQL, Git, or S3-compatible storage
 
-**→ [Complete Amp CLI Integration Guide](https://help.router-for.me/agent-client/amp-cli.html)**
+### 📡 **API Compatibility**
+Supports multiple API formats:
+- OpenAI Chat Completions API (`/v1/chat/completions`)
+- OpenAI Responses API (`/v1/responses`)
+- Gemini GenerateContent API (`/v1/models/:model:generateContent`)
+- Claude Messages API (`/v1/messages`)
+- WebSocket support for real-time streaming
 
-## SDK Docs
+### 🎨 **OAuth Integration**
+Seamless OAuth flows for:
+- Claude (Anthropic Console)
+- OpenAI Codex (GitHub)
+- Gemini CLI (Google Cloud)
+- Qwen Code
+- GitHub Copilot
+- iFlow
 
-- Usage: [docs/sdk-usage.md](docs/sdk-usage.md)
-- Advanced (executors & translators): [docs/sdk-advanced.md](docs/sdk-advanced.md)
-- Access: [docs/sdk-access.md](docs/sdk-access.md)
-- Watcher: [docs/sdk-watcher.md](docs/sdk-watcher.md)
-- Custom Provider Example: `examples/custom-provider`
+## Common Use Cases
+
+### 1️⃣ **Multi-Provider Applications**
+Build an AI app that works with multiple providers without vendor lock-in:
+```javascript
+// Same code works with Claude, Gemini, or any provider
+const response = await openai.chat.completions.create({
+  model: "claude-sonnet-4",  // or "gemini-2-flash" or "gpt-4o"
+  messages: [{ role: "user", content: "Hello" }]
+});
+```
+
+### 2️⃣ **Team Credential Management**
+Give your team access to AI models without sharing raw API keys:
+- Configure credentials once in AIProxyAPI
+- Team members use a shared proxy URL
+- Track usage per team member
+- Rotate credentials without updating applications
+
+### 3️⃣ **Development & Testing**
+Test different AI models without changing your code:
+```bash
+# Test with Claude
+curl ... -d '{"model": "claude-sonnet-4", ...}'
+
+# Test with Gemini
+curl ... -d '{"model": "gemini-2-flash", ...}'
+
+# Test with Codex
+curl ... -d '{"model": "gpt-5-codex", ...}'
+```
+
+### 4️⃣ **Cost Optimization**
+- Monitor token usage across all models
+- Set up quota limits per API key
+- Automatically switch to cheaper models on failures
+- Track spending by team, project, or user
+
+### 5️⃣ **Enterprise Deployment**
+- Deploy behind your firewall
+- Use PostgreSQL for shared credential storage
+- Multiple server instances with load balancing
+- Integrate with existing auth systems
+
+## Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/giofahreza/AIProxyAPI.git
+cd AIProxyAPI
+
+# Build the binary
+go build -o aiproxyapi cmd/server/main.go
+
+# Create config file
+cp config.example.yaml config.yaml
+```
+
+### Configuration
+
+Edit `config.yaml`:
+
+```yaml
+# Server settings
+port: 8317
+auth-dir: "~/.cli-proxy-api"
+
+# Your API keys
+api-keys:
+  - "your-secret-key"
+
+# Enable usage tracking
+usage-statistics-enabled: true
+
+# Add provider credentials (optional)
+gemini-api-key:
+  - api-key: "your-gemini-key"
+
+claude-api-key:
+  - api-key: "your-claude-key"
+```
+
+### OAuth Authentication (Optional)
+
+For OAuth providers like Claude or Codex:
+
+```bash
+# Authenticate with Claude
+./aiproxyapi --config config.yaml --claude-login
+
+# Authenticate with Codex
+./aiproxyapi --config config.yaml --codex-login
+
+# Authenticate with Gemini CLI
+./aiproxyapi --config config.yaml --login
+```
+
+### Running the Server
+
+```bash
+# Start the server
+./aiproxyapi --config config.yaml
+
+# Server starts on http://localhost:8317
+```
+
+## Management
+
+### Web Control Panel
+
+Access the management UI at `http://localhost:8317/` to:
+- View available models from all providers
+- Manage OAuth credentials
+- Monitor usage statistics
+- Update configuration
+
+### Management API
+
+```bash
+# List available models
+curl http://localhost:8317/v0/management/models \
+  -H "Authorization: Bearer your-management-key"
+
+# View usage statistics
+curl http://localhost:8317/v0/management/usage \
+  -H "Authorization: Bearer your-management-key"
+
+# List authentication entries
+curl http://localhost:8317/v0/management/auths \
+  -H "Authorization: Bearer your-management-key"
+```
+
+## Architecture
+
+```
+┌─────────────┐
+│   Client    │
+│ Application │
+└──────┬──────┘
+       │ OpenAI API Format
+       ▼
+┌─────────────────────────────────┐
+│        AIProxyAPI               │
+│  ┌──────────────────────────┐  │
+│  │   API Key Validation     │  │
+│  └────────────┬─────────────┘  │
+│               ▼                 │
+│  ┌──────────────────────────┐  │
+│  │  Protocol Translation    │  │
+│  │  (OpenAI ↔ Gemini ↔ Claude) │
+│  └────────────┬─────────────┘  │
+│               ▼                 │
+│  ┌──────────────────────────┐  │
+│  │  Credential Selection    │  │
+│  │  (Load Balancing)        │  │
+│  └────────────┬─────────────┘  │
+└───────────────┼─────────────────┘
+                │
+    ┌───────────┼───────────┐
+    ▼           ▼           ▼
+┌────────┐  ┌────────┐  ┌────────┐
+│ Claude │  │ Gemini │  │ Codex  │
+│   API  │  │  API   │  │  API   │
+└────────┘  └────────┘  └────────┘
+```
+
+## Advanced Configuration
+
+### Model Aliasing
+
+```yaml
+oauth-model-mappings:
+  gemini:
+    - name: "gemini-2.0-flash-exp"
+      alias: "gemini-flash-latest"
+  claude:
+    - name: "claude-sonnet-4-20250514"
+      alias: "claude-sonnet-4"
+```
+
+### Load Balancing Strategy
+
+```yaml
+routing:
+  strategy: "round-robin"  # Distribute evenly
+  # OR
+  strategy: "fill-first"   # Exhaust one credential first
+```
+
+### Quota Management
+
+```yaml
+quota-exceeded:
+  switch-project: true        # Auto-switch to another account
+  switch-preview-model: true  # Fall back to preview models
+
+request-retry: 3              # Retry failed requests
+max-retry-interval: 30        # Max wait time before retry (seconds)
+```
+
+### Model Prefixing (Team Isolation)
+
+```yaml
+gemini-api-key:
+  - api-key: "team-a-key"
+    prefix: "teamA"
+  - api-key: "team-b-key"
+    prefix: "teamB"
+
+# Teams use: "teamA/gemini-2-flash" and "teamB/gemini-2-flash"
+```
+
+## Storage Backends
+
+### File-Based (Default)
+```yaml
+auth-dir: "~/.cli-proxy-api"
+```
+
+### PostgreSQL
+```bash
+export PGSTORE_DSN="postgres://user:pass@localhost/aiproxy"
+./aiproxyapi --config config.yaml
+```
+
+### Git Repository
+```bash
+export GITSTORE_REMOTE_URL="https://github.com/org/auth-repo"
+export GITSTORE_USER="username"
+export GITSTORE_PASSWORD="token"
+./aiproxyapi --config config.yaml
+```
+
+### S3-Compatible (MinIO, etc.)
+```bash
+export OBJSTORE_ENDPOINT="https://minio.example.com"
+export OBJSTORE_ACCESS_KEY="access-key"
+export OBJSTORE_SECRET_KEY="secret-key"
+export OBJSTORE_BUCKET="aiproxy-auth"
+./aiproxyapi --config config.yaml
+```
+
+## Usage Statistics
+
+AIProxyAPI tracks usage automatically and stores statistics in `~/.cli-proxy-api/usage-statistics.json`:
+
+```json
+{
+  "total_requests": 1234,
+  "success_count": 1200,
+  "failure_count": 34,
+  "total_tokens": 450000,
+  "apis": {
+    "api-key-id": {
+      "models": {
+        "claude-sonnet-4": {
+          "total_requests": 500,
+          "total_tokens": 200000
+        }
+      }
+    }
+  }
+}
+```
+
+Access statistics via Management API:
+```bash
+curl http://localhost:8317/v0/management/usage \
+  -H "Authorization: Bearer your-management-key"
+```
+
+## Security
+
+- API keys are never logged or exposed
+- OAuth tokens stored securely with file permissions `600`
+- Management API protected with bcrypt-hashed secret keys
+- Optional localhost-only mode for management endpoints
+- Support for TLS/HTTPS
+
+## Production Deployment
+
+### Systemd Service
+
+```bash
+# Create service file
+sudo nano /etc/systemd/system/aiproxyapi.service
+```
+
+```ini
+[Unit]
+Description=AIProxyAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/AIProxyAPI
+ExecStart=/home/ubuntu/AIProxyAPI/aiproxyapi -config /home/ubuntu/AIProxyAPI/config.yaml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Enable and start
+sudo systemctl enable aiproxyapi
+sudo systemctl start aiproxyapi
+```
+
+### Docker (Coming Soon)
+
+```bash
+docker run -d \
+  -p 8317:8317 \
+  -v $(pwd)/config.yaml:/config.yaml \
+  -v ~/.cli-proxy-api:/auth \
+  aiproxyapi:latest
+```
+
+## Troubleshooting
+
+### Check Logs
+```bash
+# If using systemd
+sudo journalctl -u aiproxyapi -f
+
+# Or check log files
+tail -f logs/aiproxyapi.log
+```
+
+### Test Connectivity
+```bash
+# List models
+curl http://localhost:8317/v1/models
+
+# Test completion
+curl http://localhost:8317/v1/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4", "messages": [{"role": "user", "content": "test"}]}'
+```
+
+### Common Issues
+
+1. **"No providers available"**: Add API keys or complete OAuth login
+2. **"Invalid API key"**: Check `api-keys` in config.yaml
+3. **"Model not found"**: Check available models at `/v1/models`
+4. **OAuth redirect issues**: Ensure correct callback URLs in provider settings
+
+## Documentation
+
+- **Management API**: See [MANAGEMENT_API.md](https://help.router-for.me/management/api)
+- **Full Guides**: [https://help.router-for.me/](https://help.router-for.me/)
+- **SDK Usage**: See `docs/sdk-usage.md` for embedding the proxy in your Go applications
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Who is with us?
-
-Those projects are based on AIProxyAPI:
-
-### [vibeproxy](https://github.com/automazeio/vibeproxy)
-
-Native macOS menu bar app to use your Claude Code & ChatGPT subscriptions with AI coding tools - no API keys needed
-
-### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
-
-Browser-based tool to translate SRT subtitles using your Gemini subscription via AIProxyAPI with automatic validation/error correction - no API keys needed
-
-### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
-
-CLI wrapper for instant switching between multiple Claude accounts and alternative models (Gemini, Codex, Antigravity) via AIProxyAPI OAuth - no API keys needed
-
-### [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
-
-Native macOS GUI for managing AIProxyAPI: configure providers, model mappings, and endpoints via OAuth - no API keys needed.
-
-### [Quotio](https://github.com/nguyenphutrong/quotio)
-
-Native macOS menu bar app that unifies Claude, Gemini, OpenAI, Qwen, and Antigravity subscriptions with real-time quota tracking and smart auto-failover for AI coding tools like Claude Code, OpenCode, and Droid - no API keys needed.
-
-### [CodMate](https://github.com/loocor/CodMate)
-
-Native macOS SwiftUI app for managing CLI AI sessions (Codex, Claude Code, Gemini CLI) with unified provider management, Git review, project organization, global search, and terminal integration. Integrates AIProxyAPI to provide OAuth authentication for Codex, Claude, Gemini, Antigravity, and Qwen Code, with built-in and third-party provider rerouting through a single proxy endpoint - no API keys needed for OAuth providers.
-
-### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
-
-Windows-native AIProxyAPI fork with TUI, system tray, and multi-provider OAuth for AI coding tools - no API keys needed.
-
-> [!NOTE]  
-> If you developed a project based on AIProxyAPI, please open a PR to add it to this list.
-
-## More choices
-
-Those projects are ports of AIProxyAPI or inspired by it:
-
-### [9Router](https://github.com/decolua/9router)
-
-A Next.js implementation inspired by AIProxyAPI, easy to install and use, built from scratch with format translation (OpenAI/Claude/Gemini/Ollama), combo system with auto-fallback, multi-account management with exponential backoff, a Next.js web dashboard, and support for CLI tools (Cursor, Claude Code, Cline, RooCode) - no API keys needed.
-
-> [!NOTE]  
-> If you have developed a port of AIProxyAPI or a project inspired by it, please open a PR to add it to this list.
+This project is a fork of [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+**Copyright:**
+- 2025-2025.9: Luis Pater
+- 2025.9-present: Router-For.ME
+
+## Support
+
+For issues, questions, or feature requests, please open an issue on GitHub.
+
