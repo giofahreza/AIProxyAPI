@@ -441,17 +441,22 @@ func main() {
 		sdkAuth.RegisterTokenStore(sdkAuth.NewFileTokenStore())
 	}
 
-	// Register the usage statistics store for persistence (only if PostgresStore is available).
-	if usePostgresStore && pgStoreInst != nil {
-		usage.RegisterUsageStore(pgStoreInst)
-		// Load existing statistics from database
-		loadCtx, loadCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		if err := usage.LoadStatistics(loadCtx); err != nil {
-			log.WithError(err).Warn("failed to load usage statistics from postgres")
+	// Register the usage statistics store for file-based persistence.
+	if cfg.AuthDir != "" {
+		fileStore, err := store.NewFileStore(cfg.AuthDir)
+		if err != nil {
+			log.WithError(err).Warn("failed to initialize file-based usage statistics store")
 		} else {
-			log.Info("usage statistics loaded from postgres")
+			usage.RegisterUsageStore(fileStore)
+			// Load existing statistics from file
+			loadCtx, loadCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if err := usage.LoadStatistics(loadCtx); err != nil {
+				log.WithError(err).Warn("failed to load usage statistics from file")
+			} else {
+				log.Info("usage statistics loaded from file")
+			}
+			loadCancel()
 		}
-		loadCancel()
 	}
 
 	// Register built-in access providers before constructing services.
