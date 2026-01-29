@@ -1,4 +1,4 @@
-module github.com/router-for-me/CLIProxyAPI/v6
+module github.com/giofahreza/AIProxyAPI
 
 go 1.24.0
 

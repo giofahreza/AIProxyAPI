@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/runtime/geminicli"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+	"github.com/giofahreza/AIProxyAPI/internal/runtime/geminicli"
+	coreauth "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/auth"
 )
 
 // FileSynthesizer generates Auth entries from OAuth JSON files.

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	baseauth "github.com/router-for-me/CLIProxyAPI/v6/internal/auth"
+	baseauth "github.com/giofahreza/AIProxyAPI/internal/auth"
 )
 
 // Auth encapsulates the runtime state and metadata associated with a single credential.

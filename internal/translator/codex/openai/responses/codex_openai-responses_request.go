@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/misc"
+	"github.com/giofahreza/AIProxyAPI/internal/misc"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )

@@ -13,13 +13,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
-	coreexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
+	"github.com/giofahreza/AIProxyAPI/internal/interfaces"
+	"github.com/giofahreza/AIProxyAPI/internal/logging"
+	"github.com/giofahreza/AIProxyAPI/internal/util"
+	coreauth "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/auth"
+	coreexecutor "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/executor"
+	"github.com/giofahreza/AIProxyAPI/sdk/config"
+	sdktranslator "github.com/giofahreza/AIProxyAPI/sdk/translator"
 	"golang.org/x/net/context"
 )
 

@@ -11,9 +11,9 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/translator/gemini/common"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
+	"github.com/giofahreza/AIProxyAPI/internal/cache"
+	"github.com/giofahreza/AIProxyAPI/internal/translator/gemini/common"
+	"github.com/giofahreza/AIProxyAPI/internal/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"

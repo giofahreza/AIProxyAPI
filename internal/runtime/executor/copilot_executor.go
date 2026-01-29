@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	copilotauth "github.com/router-for-me/CLIProxyAPI/v6/internal/auth/copilot"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
+	copilotauth "github.com/giofahreza/AIProxyAPI/internal/auth/copilot"
+	"github.com/giofahreza/AIProxyAPI/internal/config"
+	cliproxyauth "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/auth"
+	cliproxyexecutor "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/executor"
+	sdktranslator "github.com/giofahreza/AIProxyAPI/sdk/translator"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/sjson"
 )

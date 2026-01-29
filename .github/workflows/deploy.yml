@@ -20,7 +20,7 @@ jobs:
 
       - name: Build binary
         run: |
-          GOOS=linux GOARCH=amd64 go build -o cliproxyapi cmd/server/main.go
+          GOOS=linux GOARCH=amd64 go build -o aiproxyapi cmd/server/main.go
 
       - name: Setup SSH
         run: |
@@ -32,29 +32,29 @@ jobs:
       - name: Deploy to server
         run: |
           # Copy binary to server
-          scp -i ~/.ssh/oracle.key cliproxyapi ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/CLIProxyAPI/cliproxyapi.new
+          scp -i ~/.ssh/oracle.key aiproxyapi ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/AIProxyAPI/aiproxyapi.new
 
           # SSH into server and deploy
           ssh -i ~/.ssh/oracle.key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'ENDSSH'
-            cd ~/CLIProxyAPI
+            cd ~/AIProxyAPI
 
             # Pull latest code
             GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch giofahreza
             GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git pull giofahreza main
 
             # Backup and replace binary
-            if [ -f cliproxyapi ]; then
-              cp cliproxyapi cliproxyapi.backup.$(date +%Y%m%d_%H%M%S)
+            if [ -f aiproxyapi ]; then
+              cp aiproxyapi aiproxyapi.backup.$(date +%Y%m%d_%H%M%S)
             fi
-            mv cliproxyapi.new cliproxyapi
-            chmod +x cliproxyapi
+            mv aiproxyapi.new aiproxyapi
+            chmod +x aiproxyapi
 
             # Restart service
-            sudo systemctl restart cliproxyapi.service
+            sudo systemctl restart aiproxyapi.service
 
             # Check status
             sleep 2
-            sudo systemctl status cliproxyapi.service --no-pager
+            sudo systemctl status aiproxyapi.service --no-pager
           ENDSSH
 
       - name: Verify deployment

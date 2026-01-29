@@ -59,4 +59,4 @@ test-*.js
 # macOS
 .DS_Store
 ._*
-CLIProxyAPI
+AIProxyAPI

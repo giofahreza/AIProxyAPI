@@ -1,9 +1,9 @@
 package geminiCLI
 
 import (
-	. "github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/translator/translator"
+	. "github.com/giofahreza/AIProxyAPI/internal/constant"
+	"github.com/giofahreza/AIProxyAPI/internal/interfaces"
+	"github.com/giofahreza/AIProxyAPI/internal/translator/translator"
 )
 
 func init() {

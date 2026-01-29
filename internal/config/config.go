@@ -16,8 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultPanelGitHubRepository = "https://github.com/router-for-me/Cli-Proxy-API-Management-Center"
-
 // Config represents the application's configuration, loaded from a YAML file.
 type Config struct {
 	SDKConfig `yaml:",inline"`
@@ -434,7 +432,6 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	cfg.UsageStatisticsEnabled = false
 	cfg.DisableCooling = false
 	cfg.AmpCode.RestrictManagementToLocalhost = false // Default to false: API key auth is sufficient
-	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		if optional {
 			// In cloud deploy mode, if YAML parsing fails, return empty config instead of error.
@@ -468,11 +465,6 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		// Persist the hashed value back to the config file to avoid re-hashing on next startup.
 		// Preserve YAML comments and ordering; update only the nested key.
 		_ = SaveConfigPreserveCommentsUpdateNestedScalar(configFile, []string{"remote-management", "secret-key"}, hashed)
-	}
-
-	cfg.RemoteManagement.PanelGitHubRepository = strings.TrimSpace(cfg.RemoteManagement.PanelGitHubRepository)
-	if cfg.RemoteManagement.PanelGitHubRepository == "" {
-		cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
 	}
 
 	if cfg.LogsMaxTotalSizeMB < 0 {

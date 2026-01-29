@@ -3,8 +3,8 @@ package auth
 import (
 	"strings"
 
-	internalconfig "github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
+	internalconfig "github.com/giofahreza/AIProxyAPI/internal/config"
+	"github.com/giofahreza/AIProxyAPI/internal/util"
 )
 
 type modelNameMappingTable struct {

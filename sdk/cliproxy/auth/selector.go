@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
+	cliproxyexecutor "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/executor"
 )
 
 // RoundRobinSelector provides a simple provider scoped round-robin selection strategy.

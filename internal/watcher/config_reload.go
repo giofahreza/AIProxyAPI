@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/watcher/diff"
+	"github.com/giofahreza/AIProxyAPI/internal/config"
+	"github.com/giofahreza/AIProxyAPI/internal/util"
+	"github.com/giofahreza/AIProxyAPI/internal/watcher/diff"
 	"gopkg.in/yaml.v3"
 
 	log "github.com/sirupsen/logrus"

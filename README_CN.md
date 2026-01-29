@@ -58,7 +58,7 @@ GLM CODING PLAN 是专为AI编码打造的订阅套餐，每月最低仅需20元
 
 ## 新手入门
 
-CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
+AIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
 
 ## 管理 API 文档
 
@@ -66,7 +66,7 @@ CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-fo
 
 ## Amp CLI 支持
 
-CLIProxyAPI 已内置对 [Amp CLI](https://ampcode.com) 和 Amp IDE 扩展的支持，可让你使用自己的 Google/ChatGPT/Claude OAuth 订阅来配合 Amp 编码工具：
+AIProxyAPI 已内置对 [Amp CLI](https://ampcode.com) 和 Amp IDE 扩展的支持，可让你使用自己的 Google/ChatGPT/Claude OAuth 订阅来配合 Amp 编码工具：
 
 - 提供商路由别名，兼容 Amp 的 API 路径模式（`/api/provider/{provider}/v1...`）
 - 管理代理，处理 OAuth 认证和账号功能
@@ -95,7 +95,7 @@ CLIProxyAPI 已内置对 [Amp CLI](https://ampcode.com) 和 Amp IDE 扩展的支
 
 ## 谁与我们在一起？
 
-这些项目基于 CLIProxyAPI:
+这些项目基于 AIProxyAPI:
 
 ### [vibeproxy](https://github.com/automazeio/vibeproxy)
 
@@ -107,11 +107,11 @@ CLIProxyAPI 已内置对 [Amp CLI](https://ampcode.com) 和 Amp IDE 扩展的支
 
 ### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
 
-CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
+CLI 封装器，用于通过 AIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
 
 ### [ProxyPal](https://github.com/heyhuynhgiabuu/proxypal)
 
-基于 macOS 平台的原生 CLIProxyAPI GUI：配置供应商、模型映射以及OAuth端点，无需 API 密钥。
+基于 macOS 平台的原生 AIProxyAPI GUI：配置供应商、模型映射以及OAuth端点，无需 API 密钥。
 
 ### [Quotio](https://github.com/nguyenphutrong/quotio)
 
@@ -119,25 +119,25 @@ CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户�
 
 ### [CodMate](https://github.com/loocor/CodMate)
 
-原生 macOS SwiftUI 应用，用于管理 CLI AI 会话（Claude Code、Codex、Gemini CLI），提供统一的提供商管理、Git 审查、项目组织、全局搜索和终端集成。集成 CLIProxyAPI 为 Codex、Claude、Gemini、Antigravity 和 Qwen Code 提供统一的 OAuth 认证，支持内置和第三方提供商通过单一代理端点重路由 - OAuth 提供商无需 API 密钥。
+原生 macOS SwiftUI 应用，用于管理 CLI AI 会话（Claude Code、Codex、Gemini CLI），提供统一的提供商管理、Git 审查、项目组织、全局搜索和终端集成。集成 AIProxyAPI 为 Codex、Claude、Gemini、Antigravity 和 Qwen Code 提供统一的 OAuth 认证，支持内置和第三方提供商通过单一代理端点重路由 - OAuth 提供商无需 API 密钥。
 
 ### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
 
-原生 Windows CLIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
+原生 Windows AIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
 
 > [!NOTE]  
-> 如果你开发了基于 CLIProxyAPI 的项目，请提交一个 PR（拉取请求）将其添加到此列表中。
+> 如果你开发了基于 AIProxyAPI 的项目，请提交一个 PR（拉取请求）将其添加到此列表中。
 
 ## 更多选择
 
-以下项目是 CLIProxyAPI 的移植版或受其启发：
+以下项目是 AIProxyAPI 的移植版或受其启发：
 
 ### [9Router](https://github.com/decolua/9router)
 
-基于 Next.js 的实现，灵感来自 CLIProxyAPI，易于安装使用；自研格式转换（OpenAI/Claude/Gemini/Ollama）、组合系统与自动回退、多账户管理（指数退避）、Next.js Web 控制台，并支持 Cursor、Claude Code、Cline、RooCode 等 CLI 工具，无需 API 密钥。
+基于 Next.js 的实现，灵感来自 AIProxyAPI，易于安装使用；自研格式转换（OpenAI/Claude/Gemini/Ollama）、组合系统与自动回退、多账户管理（指数退避）、Next.js Web 控制台，并支持 Cursor、Claude Code、Cline、RooCode 等 CLI 工具，无需 API 密钥。
 
 > [!NOTE]  
-> 如果你开发了 CLIProxyAPI 的移植或衍生项目，请提交 PR 将其添加到此列表中。
+> 如果你开发了 AIProxyAPI 的移植或衍生项目，请提交 PR 将其添加到此列表中。
 
 ## 许可证
 
@@ -149,4 +149,4 @@ QQ 群：188637136
 
 或
 
-Telegram 群：https://t.me/CLIProxyAPI
+Telegram 群：https://t.me/AIProxyAPI
