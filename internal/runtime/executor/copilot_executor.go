@@ -66,6 +66,9 @@ func (e *CopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, 
 		return resp, err
 	}
 	applyCopilotHeaders(httpReq, token)
+	if containsVisionContent(body) {
+		httpReq.Header.Set("Copilot-Vision-Request", "true")
+	}
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -152,6 +155,9 @@ func (e *CopilotExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.
 		return nil, err
 	}
 	applyCopilotHeaders(httpReq, token)
+	if containsVisionContent(body) {
+		httpReq.Header.Set("Copilot-Vision-Request", "true")
+	}
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -372,6 +378,12 @@ func (e *CopilotExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Au
 
 	response := fmt.Sprintf(`{"total_tokens":%d}`, count)
 	return cliproxyexecutor.Response{Payload: []byte(response)}, nil
+}
+
+// containsVisionContent checks if the request body contains image content
+// that requires the Copilot-Vision-Request header.
+func containsVisionContent(body []byte) bool {
+	return bytes.Contains(body, []byte(`"image_url"`)) || bytes.Contains(body, []byte(`"image"`))
 }
 
 // extractModelFromJSON extracts the model field from JSON body
