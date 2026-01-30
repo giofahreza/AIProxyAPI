@@ -107,7 +107,12 @@ async function renderOAuth(container) {
                 </div>
             </div>
         </div>
+
+        <div id="authFilesSection"></div>
     `;
+
+    // Render auth files section at the bottom
+    renderAuthFiles(document.getElementById('authFilesSection'));
 }
 
 async function startOAuth(provider) {

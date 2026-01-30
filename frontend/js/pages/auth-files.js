@@ -5,13 +5,13 @@ async function renderAuthFiles(container) {
         const response = await API.listAuthFiles();
         // API returns { files: [...] } object, extract the files array
         const files = response?.files || response || [];
-        const filesList = Array.isArray(files) ? files : [];
+        const filesList = (Array.isArray(files) ? files : []).filter(f => (f.name || '') !== 'usage-statistics.json');
 
         container.innerHTML = `
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">Authentication Files</h2>
-                    <button class="btn btn-secondary btn-sm" onclick="renderAuthFiles(document.getElementById('pageContent'))">Refresh</button>
+                    <button class="btn btn-secondary btn-sm" onclick="renderAuthFiles(document.getElementById('authFilesSection') || document.getElementById('pageContent'))">Refresh</button>
                 </div>
                 <div class="card-body">
                     <div id="authFilesAlert"></div>
@@ -137,7 +137,7 @@ async function uploadAuthFile() {
         }
 
         input.value = '';
-        renderAuthFiles(document.getElementById('pageContent'));
+        renderAuthFiles(document.getElementById('authFilesSection') || document.getElementById('pageContent'));
     } catch (error) {
         showAlert('Failed to upload: ' + error.message, 'error');
     }
@@ -156,7 +156,7 @@ async function importVertexCredential() {
         await API.importVertexCredential(content);
         showAlert('Vertex credential imported successfully!', 'success');
         document.getElementById('vertexCredentialContent').value = '';
-        renderAuthFiles(document.getElementById('pageContent'));
+        renderAuthFiles(document.getElementById('authFilesSection') || document.getElementById('pageContent'));
     } catch (error) {
         if (error instanceof SyntaxError) {
             showAlert('Invalid JSON format', 'error');
@@ -221,7 +221,7 @@ async function deleteAuthFile(filename) {
     try {
         await API.deleteAuthFile(filename);
         showAlert('Auth file deleted successfully!', 'success');
-        renderAuthFiles(document.getElementById('pageContent'));
+        renderAuthFiles(document.getElementById('authFilesSection') || document.getElementById('pageContent'));
     } catch (error) {
         showAlert('Failed to delete: ' + error.message, 'error');
     }
@@ -321,7 +321,7 @@ async function startCopilotReauth() {
                         showAlert('GitHub Copilot re-authentication successful!', 'success');
                         setTimeout(() => {
                             closeModal();
-                            renderAuthFiles(document.getElementById('pageContent'));
+                            renderAuthFiles(document.getElementById('authFilesSection') || document.getElementById('pageContent'));
                         }, 1500);
                     } else if (status.status === 'error') {
                         clearInterval(pollInterval);
@@ -404,7 +404,7 @@ async function pollReauthStatus(state, providerName) {
             const status = await API.getAuthStatus(state);
             if (status.status === 'ok') {
                 showAlert(`${providerName} re-authentication successful!`, 'success');
-                renderAuthFiles(document.getElementById('pageContent'));
+                renderAuthFiles(document.getElementById('authFilesSection') || document.getElementById('pageContent'));
                 return;
             } else if (status.status === 'error') {
                 showAlert(`${providerName} re-authentication failed: ` + (status.error || 'Unknown error'), 'error');

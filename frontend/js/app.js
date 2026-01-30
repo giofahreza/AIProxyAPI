@@ -192,9 +192,6 @@ const App = {
             case 'providers':
                 renderProviders(container);
                 break;
-            case 'auth-files':
-                renderAuthFiles(container);
-                break;
             case 'oauth':
                 renderOAuth(container);
                 break;
