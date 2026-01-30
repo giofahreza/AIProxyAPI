@@ -55,6 +55,11 @@ func LimitsMiddleware(enforcer *limits.Enforcer) gin.HandlerFunc {
 			return
 		}
 
+		// Set allowed credentials on context for downstream credential filtering
+		if allowedCreds := enforcer.GetAllowedCredentials(apiKey); len(allowedCreds) > 0 {
+			c.Set("allowedCredentials", allowedCreds)
+		}
+
 		c.Next()
 	}
 }

@@ -25,13 +25,14 @@ async function renderAPIKeys(container) {
                 </div>
                 <div class="card-body">
                     <div id="apiKeysAlert"></div>
-                    <p class="text-muted mb-3">Manage API keys and configure model access restrictions and monthly quotas.</p>
+                    <p class="text-muted mb-3">Manage API keys and configure model access restrictions, credential restrictions, and monthly quotas.</p>
                     ${keys.length === 0 ? '<p class="text-center">No API keys configured</p>' : `
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>API Key</th>
                                     <th>Allowed Models</th>
+                                    <th>Allowed Credentials</th>
                                     <th>Monthly Quotas</th>
                                     <th width="150">Actions</th>
                                 </tr>
@@ -41,6 +42,7 @@ async function renderAPIKeys(container) {
                                     const limit = limitsMap[key];
                                     const allowedModels = limit ? (limit['allowed-models'] || limit.allowedModels || limit.allowed_models || []) : [];
                                     const monthlyQuotas = limit ? (limit['monthly-quotas'] || limit.monthlyQuotas || limit.monthly_quotas || {}) : {};
+                                    const allowedCredentials = limit ? (limit['allowed-credentials'] || limit.allowedCredentials || limit.allowed_credentials || []) : [];
 
                                     // Generate quota display with unlimited indicators
                                     let quotaDisplay;
@@ -78,6 +80,16 @@ async function renderAPIKeys(container) {
                                         ).join('')}${Object.keys(monthlyQuotas).length > 2 ? `<div class="text-muted">+${Object.keys(monthlyQuotas).length - 2} more</div>` : ''}</div>`;
                                     }
 
+                                    // Generate credential display
+                                    let credentialDisplay;
+                                    if (allowedCredentials.length === 0) {
+                                        credentialDisplay = '<span class="badge badge-success">All</span>';
+                                    } else {
+                                        const shown = allowedCredentials.slice(0, 2).map(id => `<code>${escapeHtml(id.length > 20 ? id.substring(0, 17) + '...' : id)}</code>`).join(', ');
+                                        const moreCount = allowedCredentials.length - 2;
+                                        credentialDisplay = `<div class="quota-compact">${shown}${moreCount > 0 ? ` <span class="text-muted">+${moreCount} more</span>` : ''}</div>`;
+                                    }
+
                                     return `
                                         <tr>
                                             <td><code>${escapeHtml(key)}</code></td>
@@ -87,6 +99,7 @@ async function renderAPIKeys(container) {
                                                     : `<div class="model-list-compact">${allowedModels.slice(0, 3).map(m => `<span class="badge">${escapeHtml(m)}</span>`).join(' ')}${allowedModels.length > 3 ? ` <span class="text-muted">+${allowedModels.length - 3} more</span>` : ''}</div>`
                                                 }
                                             </td>
+                                            <td>${credentialDisplay}</td>
                                             <td>${quotaDisplay}</td>
                                             <td>
                                                 <button class="btn btn-primary btn-sm" onclick='editAPIKey(${JSON.stringify({key: key, limit: limit}).replace(/'/g, "&apos;")})'>Edit</button>
@@ -106,7 +119,28 @@ async function renderAPIKeys(container) {
     }
 }
 
-function showAddAPIKeyDialog() {
+async function showAddAPIKeyDialog() {
+    // Fetch available credentials for the checkbox list
+    let credentials = [];
+    try {
+        const authFiles = await API.listAuthFiles();
+        credentials = authFiles.files || authFiles || [];
+    } catch (e) {
+        // If fetching fails, we'll just show an empty list
+    }
+
+    const credentialCheckboxes = credentials.length > 0
+        ? credentials.map(cred => {
+            const id = cred.id || cred.ID || '';
+            const provider = cred.provider || cred.Provider || '';
+            const account = cred.account || cred.email || cred.Account || cred.Email || id;
+            return `<label class="checkbox-label">
+                <input type="checkbox" class="credential-checkbox" value="${escapeHtml(id)}">
+                <span class="badge badge-sm">${escapeHtml(provider)}</span> ${escapeHtml(account)}
+            </label>`;
+        }).join('')
+        : '<small class="text-muted">No credentials available</small>';
+
     showModal('Add API Key', `
         <div class="form-group">
             <label for="newApiKey">API Key *</label>
@@ -157,6 +191,14 @@ function showAddAPIKeyDialog() {
             <button type="button" class="btn btn-sm btn-secondary" style="margin-top: 8px;" onclick="addQuotaEntry()">+ Add Quota</button>
             <small class="form-text">Set monthly request limits per model. Leave empty for unlimited.</small>
         </div>
+
+        <div class="form-group">
+            <label>Allowed Credentials</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-bottom: 8px;">
+                ${credentialCheckboxes}
+            </div>
+            <small class="form-text">Leave all unchecked to allow all credentials.</small>
+        </div>
     `, async () => {
         const key = document.getElementById('newApiKey').value.trim();
         if (!key) {
@@ -186,16 +228,21 @@ function showAddAPIKeyDialog() {
             }
         });
 
+        // Collect selected credentials
+        const allowedCredentials = Array.from(document.querySelectorAll('.credential-checkbox:checked'))
+            .map(cb => cb.value);
+
         try {
             // Add the API key first
             await API.addAPIKey(key);
 
             // If there are limits, add them
-            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0) {
+            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0 || allowedCredentials.length > 0) {
                 await API.addOrUpdateAPIKeyLimit({
                     'api-key': key,
                     'allowed-models': allowedModels,
-                    'monthly-quotas': monthlyQuotas
+                    'monthly-quotas': monthlyQuotas,
+                    'allowed-credentials': allowedCredentials
                 });
             }
 
@@ -207,12 +254,13 @@ function showAddAPIKeyDialog() {
     });
 }
 
-function editAPIKey(data) {
+async function editAPIKey(data) {
     const oldKey = data.key;
     const limit = data.limit || {};
 
     const allowedModels = limit['allowed-models'] || limit.allowedModels || limit.allowed_models || [];
     const monthlyQuotas = limit['monthly-quotas'] || limit.monthlyQuotas || limit.monthly_quotas || {};
+    const allowedCredentials = limit['allowed-credentials'] || limit.allowedCredentials || limit.allowed_credentials || [];
 
     // Separate checkbox patterns from custom models
     const checkboxPatterns = ['gpt-*', 'gpt-4*', 'claude-*', 'claude-sonnet-*', 'gemini-*', 'o1-*'];
@@ -229,6 +277,28 @@ function editAPIKey(data) {
             <input type="text" class="quota-model" placeholder="Model name or pattern" style="width: 58%;">
             <input type="number" class="quota-limit" placeholder="Requests/month" style="width: 38%; margin-left: 4px;" min="1">
         </div>`;
+
+    // Fetch available credentials for the checkbox list
+    let credentials = [];
+    try {
+        const authFiles = await API.listAuthFiles();
+        credentials = authFiles.files || authFiles || [];
+    } catch (e) {
+        // If fetching fails, we'll just show an empty list
+    }
+
+    const credentialCheckboxes = credentials.length > 0
+        ? credentials.map(cred => {
+            const id = cred.id || cred.ID || '';
+            const provider = cred.provider || cred.Provider || '';
+            const account = cred.account || cred.email || cred.Account || cred.Email || id;
+            const isChecked = allowedCredentials.includes(id) ? 'checked' : '';
+            return `<label class="checkbox-label">
+                <input type="checkbox" class="credential-checkbox" value="${escapeHtml(id)}" ${isChecked}>
+                <span class="badge badge-sm">${escapeHtml(provider)}</span> ${escapeHtml(account)}
+            </label>`;
+        }).join('')
+        : '<small class="text-muted">No credentials available</small>';
 
     showModal('Edit API Key & Limits', `
         <div class="form-group">
@@ -277,6 +347,14 @@ function editAPIKey(data) {
             <button type="button" class="btn btn-sm btn-secondary" style="margin-top: 8px;" onclick="addQuotaEntry()">+ Add Quota</button>
             <small class="form-text">Set monthly request limits per model. Leave empty for unlimited.</small>
         </div>
+
+        <div class="form-group">
+            <label>Allowed Credentials</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-bottom: 8px;">
+                ${credentialCheckboxes}
+            </div>
+            <small class="form-text">Leave all unchecked to allow all credentials.</small>
+        </div>
     `, async () => {
         const newKey = document.getElementById('editApiKey').value.trim();
         if (!newKey) {
@@ -306,6 +384,10 @@ function editAPIKey(data) {
             }
         });
 
+        // Collect selected credentials
+        const allowedCredentials = Array.from(document.querySelectorAll('.credential-checkbox:checked'))
+            .map(cb => cb.value);
+
         try {
             // If key changed, update it
             if (newKey !== oldKey) {
@@ -322,11 +404,12 @@ function editAPIKey(data) {
             }
 
             // Update or create limits
-            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0) {
+            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0 || allowedCredentials.length > 0) {
                 await API.addOrUpdateAPIKeyLimit({
                     'api-key': newKey,
                     'allowed-models': allowedModels,
-                    'monthly-quotas': monthlyQuotas
+                    'monthly-quotas': monthlyQuotas,
+                    'allowed-credentials': allowedCredentials
                 });
             } else {
                 // No limits specified, remove any existing limits

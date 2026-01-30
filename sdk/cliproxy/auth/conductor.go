@@ -1201,6 +1201,26 @@ func (m *Manager) pickNext(ctx context.Context, provider, model string, opts cli
 		}
 		candidates = append(candidates, candidate)
 	}
+
+	// Filter candidates by allowed credentials if set on the gin context
+	if ginCtx, ok := ctx.Value("gin").(interface{ Get(string) (any, bool) }); ok && ginCtx != nil {
+		if allowedRaw, exists := ginCtx.Get("allowedCredentials"); exists {
+			if allowed, ok := allowedRaw.([]string); ok && len(allowed) > 0 {
+				allowedSet := make(map[string]struct{}, len(allowed))
+				for _, id := range allowed {
+					allowedSet[id] = struct{}{}
+				}
+				filtered := candidates[:0]
+				for _, c := range candidates {
+					if _, ok := allowedSet[c.ID]; ok {
+						filtered = append(filtered, c)
+					}
+				}
+				candidates = filtered
+			}
+		}
+	}
+
 	if len(candidates) == 0 {
 		m.mu.RUnlock()
 		return nil, nil, &Error{Code: "auth_not_found", Message: "no auth available"}

@@ -130,6 +130,10 @@ type APIKeyLimit struct {
 	// The key is the model name (supports wildcards), and the value is the monthly request limit.
 	// If empty or nil, no quota limits are enforced.
 	MonthlyQuotas map[string]int `yaml:"monthly-quotas,omitempty" json:"monthly-quotas,omitempty"`
+
+	// AllowedCredentials lists the credential IDs this API key can use.
+	// If empty or nil, all credentials are allowed.
+	AllowedCredentials []string `yaml:"allowed-credentials,omitempty" json:"allowed-credentials,omitempty"`
 }
 
 // RemoteManagement holds management API configuration under 'remote-management'.
@@ -625,12 +629,28 @@ func (cfg *Config) SanitizeAPIKeyLimits() {
 			quotas[m] = quota
 		}
 
-		// Only add if there are restrictions or quotas
-		if len(allowedModels) > 0 || len(quotas) > 0 {
+		// Normalize allowed credentials
+		allowedCreds := make([]string, 0, len(limit.AllowedCredentials))
+		seenCreds := make(map[string]struct{})
+		for _, cred := range limit.AllowedCredentials {
+			c := strings.TrimSpace(cred)
+			if c == "" {
+				continue
+			}
+			if _, exists := seenCreds[c]; exists {
+				continue
+			}
+			seenCreds[c] = struct{}{}
+			allowedCreds = append(allowedCreds, c)
+		}
+
+		// Only add if there are restrictions, quotas, or credential restrictions
+		if len(allowedModels) > 0 || len(quotas) > 0 || len(allowedCreds) > 0 {
 			out = append(out, APIKeyLimit{
-				APIKey:        apiKey,
-				AllowedModels: allowedModels,
-				MonthlyQuotas: quotas,
+				APIKey:             apiKey,
+				AllowedModels:      allowedModels,
+				MonthlyQuotas:      quotas,
+				AllowedCredentials: allowedCreds,
 			})
 		}
 	}

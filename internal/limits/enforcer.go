@@ -110,6 +110,25 @@ func (e *Enforcer) GetQuotaStatus(apiKey, modelName string) (current int64, limi
 	return currentUsage, 0, false
 }
 
+// GetAllowedCredentials returns the list of allowed credential IDs for an API key.
+// If the API key has no credential restrictions, it returns nil (all credentials allowed).
+func (e *Enforcer) GetAllowedCredentials(apiKey string) []string {
+	if e == nil || len(e.limits) == 0 {
+		return nil
+	}
+
+	for i := range e.limits {
+		if e.limits[i].APIKey == apiKey {
+			if len(e.limits[i].AllowedCredentials) == 0 {
+				return nil // No restrictions
+			}
+			return e.limits[i].AllowedCredentials
+		}
+	}
+
+	return nil // No restrictions
+}
+
 // GetAllowedModels returns the list of allowed models for an API key.
 // If the API key has no restrictions, it returns nil (all models allowed).
 func (e *Enforcer) GetAllowedModels(apiKey string) []string {
