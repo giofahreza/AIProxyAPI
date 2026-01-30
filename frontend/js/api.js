@@ -434,17 +434,9 @@ const API = {
     },
 
     async getAvailableModels() {
-        // Fetch models from the /v1/models endpoint
-        const url = `${this.baseUrl}/v1/models`;
+        // Fetch models from the management endpoint
         try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const data = await response.json();
+            const data = await this.get('/models');
             return data.data || data.models || [];
         } catch (error) {
             console.error('Failed to fetch models:', error);

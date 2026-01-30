@@ -277,6 +277,13 @@ func (h *Handler) ListAuthFiles(c *gin.Context) {
 	c.JSON(200, gin.H{"files": files})
 }
 
+// GetAllModels returns all available models from the global registry
+func (h *Handler) GetAllModels(c *gin.Context) {
+	reg := registry.GetGlobalRegistry()
+	models := reg.GetAvailableModels("openai")
+	c.JSON(200, gin.H{"data": models})
+}
+
 // GetAuthFileModels returns the models supported by a specific auth file
 func (h *Handler) GetAuthFileModels(c *gin.Context) {
 	name := c.Query("name")
