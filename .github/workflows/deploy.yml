@@ -38,10 +38,6 @@ jobs:
           ssh -i ~/.ssh/oracle.key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} << 'ENDSSH'
             cd ~/AIProxyAPI
 
-            # Pull latest code
-            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch giofahreza
-            GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git pull giofahreza main
-
             # Backup and replace binary
             if [ -f aiproxyapi ]; then
               cp aiproxyapi aiproxyapi.backup.$(date +%Y%m%d_%H%M%S)

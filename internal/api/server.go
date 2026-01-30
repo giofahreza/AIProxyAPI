@@ -9,6 +9,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/giofahreza/AIProxyAPI/frontend"
 	"github.com/giofahreza/AIProxyAPI/internal/access"
 	managementHandlers "github.com/giofahreza/AIProxyAPI/internal/api/handlers/management"
 	"github.com/giofahreza/AIProxyAPI/internal/api/middleware"
@@ -317,8 +319,9 @@ func (s *Server) setupRoutes() {
 	// Serve frontend at root and /management.html
 	s.engine.GET("/", s.serveManagementControlPanel)
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
-	// Serve frontend static files
-	s.engine.Static("/frontend", "./frontend")
+	// Serve frontend static files from embedded filesystem
+	frontendFS, _ := fs.Sub(frontend.EmbeddedFS, ".")
+	s.engine.StaticFS("/frontend", http.FS(frontendFS))
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	geminiHandlers := gemini.NewGeminiAPIHandler(s.handlers)
 	geminiCLIHandlers := gemini.NewGeminiCLIAPIHandler(s.handlers)
@@ -661,10 +664,10 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 		return
 	}
 
-	// Serve the new frontend index.html
-	frontendPath := filepath.Join("frontend", "index.html")
-	if _, err := os.Stat(frontendPath); err == nil {
-		c.File(frontendPath)
+	// Serve the embedded frontend index.html
+	data, err := frontend.EmbeddedFS.ReadFile("index.html")
+	if err == nil {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 		return
 	}
 
