@@ -271,6 +271,11 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		logDir = filepath.Join(base, "logs")
 	}
 	s.mgmt.SetLogDirectory(logDir)
+	s.mgmt.SetOnLimitsChanged(func(limits []config.APIKeyLimit) {
+		if s.limitsEnforcer != nil {
+			s.limitsEnforcer.Reload(limits)
+		}
+	})
 	s.localPassword = optionState.localPassword
 
 	// Setup routes

@@ -57,6 +57,7 @@ func (h *Handler) PutAPIKeyLimits(c *gin.Context) {
 		return
 	}
 
+	h.notifyLimitsChanged(cfg.APIKeyLimits)
 	c.JSON(http.StatusOK, gin.H{"api_key_limits": cfg.APIKeyLimits})
 }
 
@@ -108,6 +109,7 @@ func (h *Handler) PatchAPIKeyLimit(c *gin.Context) {
 		return
 	}
 
+	h.notifyLimitsChanged(cfg.APIKeyLimits)
 	c.JSON(http.StatusOK, gin.H{"api_key_limits": cfg.APIKeyLimits})
 }
 
@@ -151,5 +153,14 @@ func (h *Handler) DeleteAPIKeyLimit(c *gin.Context) {
 		return
 	}
 
+	h.notifyLimitsChanged(cfg.APIKeyLimits)
 	c.JSON(http.StatusOK, gin.H{"message": "API key limit deleted", "api_key_limits": cfg.APIKeyLimits})
+}
+
+// notifyLimitsChanged invokes the registered callback so the enforcer is
+// reloaded immediately after a management API change.
+func (h *Handler) notifyLimitsChanged(limits []config.APIKeyLimit) {
+	if h.onLimitsChanged != nil {
+		h.onLimitsChanged(limits)
+	}
 }

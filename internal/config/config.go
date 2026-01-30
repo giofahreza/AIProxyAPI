@@ -101,7 +101,7 @@ type Config struct {
 	Payload PayloadConfig `yaml:"payload" json:"payload"`
 
 	// APIKeyLimits defines per-API-key model restrictions and monthly request quotas.
-	APIKeyLimits []APIKeyLimit `yaml:"api-key-limits,omitempty" json:"api-key-limits,omitempty"`
+	APIKeyLimits []APIKeyLimit `yaml:"api-key-limits" json:"api-key-limits,omitempty"`
 
 	legacyMigrationPending bool `yaml:"-" json:"-"`
 }

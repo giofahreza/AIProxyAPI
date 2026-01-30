@@ -40,6 +40,7 @@ type Handler struct {
 	allowRemoteOverride bool
 	envSecret           string
 	logDir              string
+	onLimitsChanged     func([]config.APIKeyLimit)
 }
 
 // NewHandler creates a new management handler instance.
@@ -75,6 +76,10 @@ func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) { h.usageSt
 
 // SetLocalPassword configures the runtime-local password accepted for localhost requests.
 func (h *Handler) SetLocalPassword(password string) { h.localPassword = password }
+
+// SetOnLimitsChanged registers a callback invoked whenever API key limits are
+// modified through the management API so the caller can reload the enforcer.
+func (h *Handler) SetOnLimitsChanged(fn func([]config.APIKeyLimit)) { h.onLimitsChanged = fn }
 
 // SetLogDirectory updates the directory where main.log should be looked up.
 func (h *Handler) SetLogDirectory(dir string) {
