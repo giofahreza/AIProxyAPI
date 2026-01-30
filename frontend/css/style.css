@@ -1325,3 +1325,23 @@ code {
     color: var(--bg-primary);
     border-color: var(--accent-blue);
 }
+
+/* API Keys integrated limits compact display */
+.model-list-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.quota-compact {
+    font-size: 12px;
+}
+
+.quota-compact div {
+    margin-bottom: 2px;
+}
+
+.quota-compact code {
+    font-size: 11px;
+}
