@@ -1270,8 +1270,6 @@ func (m *Manager) persist(ctx context.Context, auth *Auth) error {
 func (m *Manager) StartAutoRefresh(parent context.Context, interval time.Duration) {
 	if interval <= 0 || interval > refreshCheckInterval {
 		interval = refreshCheckInterval
-	} else {
-		interval = refreshCheckInterval
 	}
 	if m.refreshCancel != nil {
 		m.refreshCancel()

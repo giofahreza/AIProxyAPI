@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/giofahreza/AIProxyAPI/internal/config"
 	"github.com/giofahreza/AIProxyAPI/internal/usage"
@@ -12,6 +13,7 @@ import (
 
 // Enforcer validates API key access restrictions and monthly quotas.
 type Enforcer struct {
+	mu     sync.RWMutex
 	limits []config.APIKeyLimit
 }
 
@@ -24,7 +26,14 @@ func NewEnforcer(limits []config.APIKeyLimit) *Enforcer {
 // It returns an error if access is denied, either due to model restrictions
 // or monthly quota limits.
 func (e *Enforcer) CheckAccess(apiKey, modelName string) error {
-	if e == nil || len(e.limits) == 0 {
+	if e == nil {
+		return nil
+	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if len(e.limits) == 0 {
 		// No limits configured, allow access
 		return nil
 	}
@@ -60,14 +69,21 @@ func (e *Enforcer) CheckAccess(apiKey, modelName string) error {
 	// Check monthly quotas
 	if len(limit.MonthlyQuotas) > 0 {
 		stats := usage.GetRequestStatistics()
-		currentUsage := stats.GetMonthlyUsage(apiKey, modelName)
+		allUsage := stats.GetMonthlyUsageAllModels(apiKey)
 
 		// Check if there's a quota for this specific model or a matching pattern
 		for pattern, quota := range limit.MonthlyQuotas {
 			if matchModel(pattern, modelName) {
-				if currentUsage >= int64(quota) {
+				// Aggregate usage across all models matching this quota pattern
+				var aggregatedUsage int64
+				for model, count := range allUsage {
+					if matchModel(pattern, model) {
+						aggregatedUsage += count
+					}
+				}
+				if aggregatedUsage >= int64(quota) {
 					return fmt.Errorf("monthly quota exceeded for model %q (limit: %d, current: %d)",
-						modelName, quota, currentUsage)
+						modelName, quota, aggregatedUsage)
 				}
 				// Found a matching quota, no need to check others
 				break
@@ -80,7 +96,14 @@ func (e *Enforcer) CheckAccess(apiKey, modelName string) error {
 
 // GetQuotaStatus returns the current usage and limit for a specific API key and model.
 func (e *Enforcer) GetQuotaStatus(apiKey, modelName string) (current int64, limit int, hasLimit bool) {
-	if e == nil || len(e.limits) == 0 {
+	if e == nil {
+		return 0, 0, false
+	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if len(e.limits) == 0 {
 		return 0, 0, false
 	}
 
@@ -98,22 +121,36 @@ func (e *Enforcer) GetQuotaStatus(apiKey, modelName string) (current int64, limi
 	}
 
 	stats := usage.GetRequestStatistics()
-	currentUsage := stats.GetMonthlyUsage(apiKey, modelName)
+	allUsage := stats.GetMonthlyUsageAllModels(apiKey)
 
-	// Find the quota for this model
+	// Find the quota for this model and aggregate usage across matching models
 	for pattern, quota := range limitConfig.MonthlyQuotas {
 		if matchModel(pattern, modelName) {
-			return currentUsage, quota, true
+			var aggregatedUsage int64
+			for model, count := range allUsage {
+				if matchModel(pattern, model) {
+					aggregatedUsage += count
+				}
+			}
+			return aggregatedUsage, quota, true
 		}
 	}
 
+	currentUsage := stats.GetMonthlyUsage(apiKey, modelName)
 	return currentUsage, 0, false
 }
 
 // GetAllowedCredentials returns the list of allowed credential IDs for an API key.
 // If the API key has no credential restrictions, it returns nil (all credentials allowed).
 func (e *Enforcer) GetAllowedCredentials(apiKey string) []string {
-	if e == nil || len(e.limits) == 0 {
+	if e == nil {
+		return nil
+	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if len(e.limits) == 0 {
 		return nil
 	}
 
@@ -132,7 +169,14 @@ func (e *Enforcer) GetAllowedCredentials(apiKey string) []string {
 // GetAllowedModels returns the list of allowed models for an API key.
 // If the API key has no restrictions, it returns nil (all models allowed).
 func (e *Enforcer) GetAllowedModels(apiKey string) []string {
-	if e == nil || len(e.limits) == 0 {
+	if e == nil {
+		return nil
+	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if len(e.limits) == 0 {
 		return nil
 	}
 
@@ -166,7 +210,14 @@ func matchModel(pattern, modelName string) bool {
 
 // IsModelAllowed checks if a model is allowed for a specific API key.
 func (e *Enforcer) IsModelAllowed(apiKey, modelName string) bool {
-	if e == nil || len(e.limits) == 0 {
+	if e == nil {
+		return true
+	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if len(e.limits) == 0 {
 		return true
 	}
 
@@ -193,6 +244,9 @@ func (e *Enforcer) GetMonthlyUsageSummary(apiKey string) map[string]UsageSummary
 	if e == nil {
 		return nil
 	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
 	stats := usage.GetRequestStatistics()
 	allUsage := stats.GetMonthlyUsageAllModels(apiKey)
@@ -248,7 +302,9 @@ type UsageSummary struct {
 // Reload updates the enforcer with new API key limits.
 func (e *Enforcer) Reload(limits []config.APIKeyLimit) {
 	if e != nil {
+		e.mu.Lock()
 		e.limits = limits
+		e.mu.Unlock()
 	}
 }
 

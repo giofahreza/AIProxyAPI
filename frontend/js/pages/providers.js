@@ -251,10 +251,7 @@ function collectProviderData(type) {
 
 // Gemini
 async function showAddGeminiModal() {
-    showModal('Add Gemini Key', getProviderModalContent('gemini'), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Add', class: 'btn', onclick: 'saveGeminiKey()' }
-    ]);
+    showModal('Add Gemini Key', getProviderModalContent('gemini'), saveGeminiKey);
 }
 
 async function showEditGeminiModal(idx) {
@@ -265,10 +262,7 @@ async function showEditGeminiModal(idx) {
     window._editingGeminiIdx = idx;
     window._editingGeminiKey = key;
 
-    showModal('Edit Gemini Key', getProviderModalContent('gemini', key), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Save', class: 'btn', onclick: 'updateGeminiKey()' }
-    ]);
+    showModal('Edit Gemini Key', getProviderModalContent('gemini', key), updateGeminiKey);
 }
 
 async function saveGeminiKey() {
@@ -313,10 +307,7 @@ async function deleteGeminiKey(idx) {
 
 // Claude
 async function showAddClaudeModal() {
-    showModal('Add Claude Key', getProviderModalContent('claude'), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Add', class: 'btn', onclick: 'saveClaudeKey()' }
-    ]);
+    showModal('Add Claude Key', getProviderModalContent('claude'), saveClaudeKey);
 }
 
 async function showEditClaudeModal(idx) {
@@ -327,10 +318,7 @@ async function showEditClaudeModal(idx) {
     window._editingClaudeIdx = idx;
     window._editingClaudeKey = key;
 
-    showModal('Edit Claude Key', getProviderModalContent('claude', key), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Save', class: 'btn', onclick: 'updateClaudeKey()' }
-    ]);
+    showModal('Edit Claude Key', getProviderModalContent('claude', key), updateClaudeKey);
 }
 
 async function saveClaudeKey() {
@@ -375,10 +363,7 @@ async function deleteClaudeKey(idx) {
 
 // Codex
 async function showAddCodexModal() {
-    showModal('Add Codex Key', getProviderModalContent('codex'), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Add', class: 'btn', onclick: 'saveCodexKey()' }
-    ]);
+    showModal('Add Codex Key', getProviderModalContent('codex'), saveCodexKey);
 }
 
 async function showEditCodexModal(idx) {
@@ -386,10 +371,7 @@ async function showEditCodexModal(idx) {
     const key = keys[idx];
     if (!key) return;
 
-    showModal('Edit Codex Key', getProviderModalContent('codex', key), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Save', class: 'btn', onclick: 'updateCodexKey()' }
-    ]);
+    showModal('Edit Codex Key', getProviderModalContent('codex', key), updateCodexKey);
 }
 
 async function saveCodexKey() {
@@ -434,10 +416,7 @@ async function deleteCodexKey(idx) {
 
 // Vertex
 async function showAddVertexModal() {
-    showModal('Add Vertex Key', getProviderModalContent('vertex'), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Add', class: 'btn', onclick: 'saveVertexKey()' }
-    ]);
+    showModal('Add Vertex Key', getProviderModalContent('vertex'), saveVertexKey);
 }
 
 async function showEditVertexModal(idx) {
@@ -445,10 +424,7 @@ async function showEditVertexModal(idx) {
     const key = keys[idx];
     if (!key) return;
 
-    showModal('Edit Vertex Key', getProviderModalContent('vertex', key), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Save', class: 'btn', onclick: 'updateVertexKey()' }
-    ]);
+    showModal('Edit Vertex Key', getProviderModalContent('vertex', key), updateVertexKey);
 }
 
 async function saveVertexKey() {
@@ -493,10 +469,7 @@ async function deleteVertexKey(idx) {
 
 // OpenAI Compatible
 async function showAddOpenAIModal() {
-    showModal('Add OpenAI Compatible Provider', getProviderModalContent('openai'), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Add', class: 'btn', onclick: 'saveOpenAICompat()' }
-    ]);
+    showModal('Add OpenAI Compatible Provider', getProviderModalContent('openai'), saveOpenAICompat);
 }
 
 async function showEditOpenAIModal(idx) {
@@ -515,10 +488,7 @@ async function showEditOpenAIModal(idx) {
     window._editingOpenAIIdx = idx;
     window._editingOpenAIProvider = provider;
 
-    showModal('Edit OpenAI Compatible Provider', getProviderModalContent('openai', displayData), [
-        { text: 'Cancel', class: 'btn-secondary', onclick: 'closeModal()' },
-        { text: 'Save', class: 'btn', onclick: 'updateOpenAICompat()' }
-    ]);
+    showModal('Edit OpenAI Compatible Provider', getProviderModalContent('openai', displayData), updateOpenAICompat);
 }
 
 async function saveOpenAICompat() {

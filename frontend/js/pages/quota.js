@@ -97,7 +97,17 @@ async function renderQuota(container) {
 }
 
 async function saveQuotaSettings() {
-    showAlert('Settings saved successfully!', 'success');
+    try {
+        const switchProject = document.getElementById('switchProject').checked;
+        const switchPreviewModel = document.getElementById('switchPreviewModel').checked;
+        await Promise.all([
+            API.updateSwitchProject(switchProject),
+            API.updateSwitchPreviewModel(switchPreviewModel)
+        ]);
+        showAlert('Settings saved successfully!', 'success');
+    } catch (error) {
+        showAlert('Failed to save: ' + error.message, 'error');
+    }
 }
 
 async function saveOAuthExcludedModels() {
