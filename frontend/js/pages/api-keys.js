@@ -32,6 +32,7 @@ async function renderAPIKeys(container) {
                                 <tr>
                                     <th>API Key</th>
                                     <th>Allowed Models</th>
+                                    <th>Allowed Providers</th>
                                     <th>Allowed Credentials</th>
                                     <th>Monthly Quotas</th>
                                     <th width="150">Actions</th>
@@ -43,6 +44,7 @@ async function renderAPIKeys(container) {
                                     const allowedModels = limit ? (limit['allowed-models'] || limit.allowedModels || limit.allowed_models || []) : [];
                                     const monthlyQuotas = limit ? (limit['monthly-quotas'] || limit.monthlyQuotas || limit.monthly_quotas || {}) : {};
                                     const allowedCredentials = limit ? (limit['allowed-credentials'] || limit.allowedCredentials || limit.allowed_credentials || []) : [];
+                                    const allowedProviders = limit ? (limit['allowed-providers'] || limit.allowedProviders || limit.allowed_providers || []) : [];
 
                                     // Generate quota display with unlimited indicators
                                     let quotaDisplay;
@@ -99,6 +101,10 @@ async function renderAPIKeys(container) {
                                                     : `<div class="model-list-compact">${allowedModels.slice(0, 3).map(m => `<span class="badge">${escapeHtml(m)}</span>`).join(' ')}${allowedModels.length > 3 ? ` <span class="text-muted">+${allowedModels.length - 3} more</span>` : ''}</div>`
                                                 }
                                             </td>
+                                            <td>${allowedProviders.length === 0
+                                                ? '<span class="badge badge-success">All</span>'
+                                                : `<div class="model-list-compact">${allowedProviders.slice(0, 3).map(p => `<span class="badge">${escapeHtml(p)}</span>`).join(' ')}${allowedProviders.length > 3 ? ` <span class="text-muted">+${allowedProviders.length - 3} more</span>` : ''}</div>`
+                                            }</td>
                                             <td>${credentialDisplay}</td>
                                             <td>${quotaDisplay}</td>
                                             <td>
@@ -193,6 +199,37 @@ async function showAddAPIKeyDialog() {
         </div>
 
         <div class="form-group">
+            <label>Allowed Providers</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 8px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="copilot"> Copilot
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="claude"> Claude
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="gemini"> Gemini
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="codex"> Codex
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="vertex"> Vertex
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="aistudio"> AI Studio
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="gemini-cli"> Gemini CLI
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="antigravity"> Antigravity
+                </label>
+            </div>
+            <small class="form-text">Leave all unchecked to allow all providers.</small>
+        </div>
+
+        <div class="form-group">
             <label>Allowed Credentials</label>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-bottom: 8px;">
                 ${credentialCheckboxes}
@@ -228,6 +265,10 @@ async function showAddAPIKeyDialog() {
             }
         });
 
+        // Collect selected providers
+        const allowedProviders = Array.from(document.querySelectorAll('.provider-checkbox:checked'))
+            .map(cb => cb.value);
+
         // Collect selected credentials
         const allowedCredentials = Array.from(document.querySelectorAll('.credential-checkbox:checked'))
             .map(cb => cb.value);
@@ -237,12 +278,13 @@ async function showAddAPIKeyDialog() {
             await API.addAPIKey(key);
 
             // If there are limits, add them
-            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0 || allowedCredentials.length > 0) {
+            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0 || allowedCredentials.length > 0 || allowedProviders.length > 0) {
                 await API.addOrUpdateAPIKeyLimit({
                     'api-key': key,
                     'allowed-models': allowedModels,
                     'monthly-quotas': monthlyQuotas,
-                    'allowed-credentials': allowedCredentials
+                    'allowed-credentials': allowedCredentials,
+                    'allowed-providers': allowedProviders
                 });
             }
 
@@ -261,6 +303,7 @@ async function editAPIKey(data) {
     const allowedModels = limit['allowed-models'] || limit.allowedModels || limit.allowed_models || [];
     const monthlyQuotas = limit['monthly-quotas'] || limit.monthlyQuotas || limit.monthly_quotas || {};
     const allowedCredentials = limit['allowed-credentials'] || limit.allowedCredentials || limit.allowed_credentials || [];
+    const allowedProviders = limit['allowed-providers'] || limit.allowedProviders || limit.allowed_providers || [];
 
     // Separate checkbox patterns from custom models
     const checkboxPatterns = ['gpt-*', 'gpt-4*', 'claude-*', 'claude-sonnet-*', 'gemini-*', 'o1-*'];
@@ -349,6 +392,37 @@ async function editAPIKey(data) {
         </div>
 
         <div class="form-group">
+            <label>Allowed Providers</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 8px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="copilot" ${allowedProviders.includes('copilot') ? 'checked' : ''}> Copilot
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="claude" ${allowedProviders.includes('claude') ? 'checked' : ''}> Claude
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="gemini" ${allowedProviders.includes('gemini') ? 'checked' : ''}> Gemini
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="codex" ${allowedProviders.includes('codex') ? 'checked' : ''}> Codex
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="vertex" ${allowedProviders.includes('vertex') ? 'checked' : ''}> Vertex
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="aistudio" ${allowedProviders.includes('aistudio') ? 'checked' : ''}> AI Studio
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="gemini-cli" ${allowedProviders.includes('gemini-cli') ? 'checked' : ''}> Gemini CLI
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="provider-checkbox" value="antigravity" ${allowedProviders.includes('antigravity') ? 'checked' : ''}> Antigravity
+                </label>
+            </div>
+            <small class="form-text">Leave all unchecked to allow all providers.</small>
+        </div>
+
+        <div class="form-group">
             <label>Allowed Credentials</label>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-bottom: 8px;">
                 ${credentialCheckboxes}
@@ -384,6 +458,10 @@ async function editAPIKey(data) {
             }
         });
 
+        // Collect selected providers
+        const allowedProviders = Array.from(document.querySelectorAll('.provider-checkbox:checked'))
+            .map(cb => cb.value);
+
         // Collect selected credentials
         const allowedCredentials = Array.from(document.querySelectorAll('.credential-checkbox:checked'))
             .map(cb => cb.value);
@@ -404,12 +482,13 @@ async function editAPIKey(data) {
             }
 
             // Update or create limits
-            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0 || allowedCredentials.length > 0) {
+            if (allowedModels.length > 0 || Object.keys(monthlyQuotas).length > 0 || allowedCredentials.length > 0 || allowedProviders.length > 0) {
                 await API.addOrUpdateAPIKeyLimit({
                     'api-key': newKey,
                     'allowed-models': allowedModels,
                     'monthly-quotas': monthlyQuotas,
-                    'allowed-credentials': allowedCredentials
+                    'allowed-credentials': allowedCredentials,
+                    'allowed-providers': allowedProviders
                 });
             } else {
                 // No limits specified, remove any existing limits

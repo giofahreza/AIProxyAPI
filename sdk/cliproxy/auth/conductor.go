@@ -262,6 +262,7 @@ func (m *Manager) Load(ctx context.Context) error {
 // It supports multiple providers for the same model and round-robins the starting provider per model.
 func (m *Manager) Execute(ctx context.Context, providers []string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	normalized := m.normalizeProviders(providers)
+	normalized = filterAllowedProviders(ctx, normalized)
 	if len(normalized) == 0 {
 		return cliproxyexecutor.Response{}, &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
@@ -300,6 +301,7 @@ func (m *Manager) Execute(ctx context.Context, providers []string, req cliproxye
 // It supports multiple providers for the same model and round-robins the starting provider per model.
 func (m *Manager) ExecuteCount(ctx context.Context, providers []string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	normalized := m.normalizeProviders(providers)
+	normalized = filterAllowedProviders(ctx, normalized)
 	if len(normalized) == 0 {
 		return cliproxyexecutor.Response{}, &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
@@ -338,6 +340,7 @@ func (m *Manager) ExecuteCount(ctx context.Context, providers []string, req clip
 // It supports multiple providers for the same model and round-robins the starting provider per model.
 func (m *Manager) ExecuteStream(ctx context.Context, providers []string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (<-chan cliproxyexecutor.StreamChunk, error) {
 	normalized := m.normalizeProviders(providers)
+	normalized = filterAllowedProviders(ctx, normalized)
 	if len(normalized) == 0 {
 		return nil, &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
@@ -622,6 +625,35 @@ func stripPrefixFromMetadata(metadata map[string]any, needle string) map[string]
 		return metadata
 	}
 	return out
+}
+
+// filterAllowedProviders restricts the provider list to only those permitted by the
+// allowedProviders context value (set by LimitsMiddleware). If no restriction is set,
+// all providers pass through unchanged.
+func filterAllowedProviders(ctx context.Context, providers []string) []string {
+	ginCtx, ok := ctx.Value("gin").(interface{ Get(string) (any, bool) })
+	if !ok || ginCtx == nil {
+		return providers
+	}
+	allowedRaw, exists := ginCtx.Get("allowedProviders")
+	if !exists {
+		return providers
+	}
+	allowed, ok := allowedRaw.([]string)
+	if !ok || len(allowed) == 0 {
+		return providers
+	}
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, p := range allowed {
+		allowedSet[strings.ToLower(strings.TrimSpace(p))] = struct{}{}
+	}
+	filtered := make([]string, 0, len(providers))
+	for _, p := range providers {
+		if _, ok := allowedSet[strings.ToLower(strings.TrimSpace(p))]; ok {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
 }
 
 func (m *Manager) normalizeProviders(providers []string) []string {

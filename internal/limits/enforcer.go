@@ -166,6 +166,32 @@ func (e *Enforcer) GetAllowedCredentials(apiKey string) []string {
 	return nil // No restrictions
 }
 
+// GetAllowedProviders returns the list of allowed provider identifiers for an API key.
+// If the API key has no provider restrictions, it returns nil (all providers allowed).
+func (e *Enforcer) GetAllowedProviders(apiKey string) []string {
+	if e == nil {
+		return nil
+	}
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if len(e.limits) == 0 {
+		return nil
+	}
+
+	for i := range e.limits {
+		if e.limits[i].APIKey == apiKey {
+			if len(e.limits[i].AllowedProviders) == 0 {
+				return nil // No restrictions
+			}
+			return e.limits[i].AllowedProviders
+		}
+	}
+
+	return nil // No restrictions
+}
+
 // GetAllowedModels returns the list of allowed models for an API key.
 // If the API key has no restrictions, it returns nil (all models allowed).
 func (e *Enforcer) GetAllowedModels(apiKey string) []string {

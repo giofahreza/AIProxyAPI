@@ -134,6 +134,10 @@ type APIKeyLimit struct {
 	// AllowedCredentials lists the credential IDs this API key can use.
 	// If empty or nil, all credentials are allowed.
 	AllowedCredentials []string `yaml:"allowed-credentials,omitempty" json:"allowed-credentials,omitempty"`
+
+	// AllowedProviders lists the provider/executor identifiers this API key can route through.
+	// If empty or nil, all providers are allowed.
+	AllowedProviders []string `yaml:"allowed-providers,omitempty" json:"allowed-providers,omitempty"`
 }
 
 // RemoteManagement holds management API configuration under 'remote-management'.
@@ -644,13 +648,29 @@ func (cfg *Config) SanitizeAPIKeyLimits() {
 			allowedCreds = append(allowedCreds, c)
 		}
 
-		// Only add if there are restrictions, quotas, or credential restrictions
-		if len(allowedModels) > 0 || len(quotas) > 0 || len(allowedCreds) > 0 {
+		// Normalize allowed providers
+		allowedProviders := make([]string, 0, len(limit.AllowedProviders))
+		seenProviders := make(map[string]struct{})
+		for _, prov := range limit.AllowedProviders {
+			p := strings.ToLower(strings.TrimSpace(prov))
+			if p == "" {
+				continue
+			}
+			if _, exists := seenProviders[p]; exists {
+				continue
+			}
+			seenProviders[p] = struct{}{}
+			allowedProviders = append(allowedProviders, p)
+		}
+
+		// Only add if there are restrictions, quotas, credential restrictions, or provider restrictions
+		if len(allowedModels) > 0 || len(quotas) > 0 || len(allowedCreds) > 0 || len(allowedProviders) > 0 {
 			out = append(out, APIKeyLimit{
 				APIKey:             apiKey,
 				AllowedModels:      allowedModels,
 				MonthlyQuotas:      quotas,
 				AllowedCredentials: allowedCreds,
+				AllowedProviders:   allowedProviders,
 			})
 		}
 	}

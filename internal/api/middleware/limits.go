@@ -60,6 +60,11 @@ func LimitsMiddleware(enforcer *limits.Enforcer) gin.HandlerFunc {
 			c.Set("allowedCredentials", allowedCreds)
 		}
 
+		// Set allowed providers on context for downstream provider filtering
+		if allowedProvs := enforcer.GetAllowedProviders(apiKey); len(allowedProvs) > 0 {
+			c.Set("allowedProviders", allowedProvs)
+		}
+
 		c.Next()
 	}
 }
