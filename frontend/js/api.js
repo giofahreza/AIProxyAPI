@@ -93,23 +93,23 @@ const API = {
     },
 
     updateDebug(enabled) {
-        return this.put('/debug', { enabled });
+        return this.put('/debug', { value: enabled });
     },
 
     updateLoggingToFile(enabled) {
-        return this.put('/logging-to-file', { enabled });
+        return this.put('/logging-to-file', { value: enabled });
     },
 
     updateUsageStats(enabled) {
-        return this.put('/usage-statistics-enabled', { enabled });
+        return this.put('/usage-statistics-enabled', { value: enabled });
     },
 
     updateRequestLog(enabled) {
-        return this.put('/request-log', { enabled });
+        return this.put('/request-log', { value: enabled });
     },
 
     updateProxyUrl(url) {
-        return url ? this.put('/proxy-url', { proxy_url: url }) : this.delete('/proxy-url');
+        return url ? this.put('/proxy-url', { value: url }) : this.delete('/proxy-url');
     },
 
     updateRequestRetry(count) {
