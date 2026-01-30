@@ -31,7 +31,9 @@ func (h *Handler) putStringList(c *gin.Context, set func([]string), after func()
 	if after != nil {
 		after()
 	}
-	h.persist(c)
+	if h.persist(c) {
+		c.JSON(200, gin.H{"status": "ok"})
+	}
 }
 
 func (h *Handler) patchStringList(c *gin.Context, target *[]string, after func()) {
@@ -50,7 +52,9 @@ func (h *Handler) patchStringList(c *gin.Context, target *[]string, after func()
 		if after != nil {
 			after()
 		}
-		h.persist(c)
+		if h.persist(c) {
+			c.JSON(200, gin.H{"status": "ok"})
+		}
 		return
 	}
 	if body.Old != nil && body.New != nil {
@@ -60,7 +64,9 @@ func (h *Handler) patchStringList(c *gin.Context, target *[]string, after func()
 				if after != nil {
 					after()
 				}
-				h.persist(c)
+				if h.persist(c) {
+					c.JSON(200, gin.H{"status": "ok"})
+				}
 				return
 			}
 		}
@@ -68,7 +74,9 @@ func (h *Handler) patchStringList(c *gin.Context, target *[]string, after func()
 		if after != nil {
 			after()
 		}
-		h.persist(c)
+		if h.persist(c) {
+			c.JSON(200, gin.H{"status": "ok"})
+		}
 		return
 	}
 	c.JSON(400, gin.H{"error": "missing fields"})
@@ -83,7 +91,9 @@ func (h *Handler) deleteFromStringList(c *gin.Context, target *[]string, after f
 			if after != nil {
 				after()
 			}
-			h.persist(c)
+			if h.persist(c) {
+				c.JSON(200, gin.H{"status": "ok"})
+			}
 			return
 		}
 	}
@@ -98,7 +108,9 @@ func (h *Handler) deleteFromStringList(c *gin.Context, target *[]string, after f
 		if after != nil {
 			after()
 		}
-		h.persist(c)
+		if h.persist(c) {
+			c.JSON(200, gin.H{"status": "ok"})
+		}
 		return
 	}
 	c.JSON(400, gin.H{"error": "missing index or value"})

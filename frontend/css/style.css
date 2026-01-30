@@ -1345,3 +1345,40 @@ code {
 .quota-compact code {
     font-size: 11px;
 }
+
+/* Checkbox labels for model selection */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    user-select: none;
+}
+
+.checkbox-label:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-blue);
+}
+
+.checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-blue);
+}
+
+.checkbox-label input[type="checkbox"]:checked + * {
+    font-weight: 500;
+}
+
+/* Smaller badge variant for inline use */
+.badge-sm {
+    font-size: 10px;
+    padding: 2px 6px;
+}

@@ -42,6 +42,42 @@ async function renderAPIKeys(container) {
                                     const allowedModels = limit ? (limit['allowed-models'] || limit.allowedModels || limit.allowed_models || []) : [];
                                     const monthlyQuotas = limit ? (limit['monthly-quotas'] || limit.monthlyQuotas || limit.monthly_quotas || {}) : {};
 
+                                    // Generate quota display with unlimited indicators
+                                    let quotaDisplay;
+                                    if (allowedModels.length === 0 && Object.keys(monthlyQuotas).length === 0) {
+                                        quotaDisplay = '<span class="badge badge-info">Unlimited</span>';
+                                    } else if (allowedModels.length > 0) {
+                                        // Show quotas for allowed models
+                                        const quotaEntries = [];
+                                        const displayedModels = new Set();
+
+                                        // First, show models with quotas
+                                        Object.entries(monthlyQuotas).slice(0, 2).forEach(([model, quota]) => {
+                                            quotaEntries.push(`<div><code>${escapeHtml(model)}</code>: ${quota}/mo</div>`);
+                                            displayedModels.add(model);
+                                        });
+
+                                        // Then show some allowed models without quotas as "unlimited"
+                                        const remainingSlots = 2 - quotaEntries.length;
+                                        if (remainingSlots > 0) {
+                                            allowedModels.slice(0, remainingSlots).forEach(model => {
+                                                if (!monthlyQuotas[model]) {
+                                                    quotaEntries.push(`<div><code>${escapeHtml(model)}</code>: <span class="badge badge-info badge-sm">Unlimited</span></div>`);
+                                                    displayedModels.add(model);
+                                                }
+                                            });
+                                        }
+
+                                        const totalItems = Object.keys(monthlyQuotas).length + allowedModels.filter(m => !monthlyQuotas[m]).length;
+                                        const moreCount = totalItems - displayedModels.size;
+
+                                        quotaDisplay = `<div class="quota-compact">${quotaEntries.join('')}${moreCount > 0 ? `<div class="text-muted">+${moreCount} more</div>` : ''}</div>`;
+                                    } else {
+                                        quotaDisplay = `<div class="quota-compact">${Object.entries(monthlyQuotas).slice(0, 2).map(([model, quota]) =>
+                                            `<div><code>${escapeHtml(model)}</code>: ${quota}/mo</div>`
+                                        ).join('')}${Object.keys(monthlyQuotas).length > 2 ? `<div class="text-muted">+${Object.keys(monthlyQuotas).length - 2} more</div>` : ''}</div>`;
+                                    }
+
                                     return `
                                         <tr>
                                             <td><code>${escapeHtml(key)}</code></td>
@@ -51,14 +87,7 @@ async function renderAPIKeys(container) {
                                                     : `<div class="model-list-compact">${allowedModels.slice(0, 3).map(m => `<span class="badge">${escapeHtml(m)}</span>`).join(' ')}${allowedModels.length > 3 ? ` <span class="text-muted">+${allowedModels.length - 3} more</span>` : ''}</div>`
                                                 }
                                             </td>
-                                            <td>
-                                                ${Object.keys(monthlyQuotas).length === 0
-                                                    ? '<span class="badge badge-info">Unlimited</span>'
-                                                    : `<div class="quota-compact">${Object.entries(monthlyQuotas).slice(0, 2).map(([model, quota]) =>
-                                                        `<div><code>${escapeHtml(model)}</code>: ${quota}/mo</div>`
-                                                    ).join('')}${Object.keys(monthlyQuotas).length > 2 ? `<div class="text-muted">+${Object.keys(monthlyQuotas).length - 2} more</div>` : ''}</div>`
-                                                }
-                                            </td>
+                                            <td>${quotaDisplay}</td>
                                             <td>
                                                 <button class="btn btn-primary btn-sm" onclick='editAPIKey(${JSON.stringify({key: key, limit: limit}).replace(/'/g, "&apos;")})'>Edit</button>
                                                 <button class="btn btn-danger btn-sm" onclick="deleteAPIKey('${escapeHtml(key).replace(/'/g, "\\'")}')">Delete</button>
@@ -88,9 +117,33 @@ function showAddAPIKeyDialog() {
         <h4 style="margin-bottom: 15px;">Access Limits (Optional)</h4>
 
         <div class="form-group">
-            <label for="allowedModels">Allowed Models</label>
-            <textarea id="allowedModels" rows="4" placeholder="Leave empty for all models, or enter one per line:&#10;gpt-4&#10;claude-sonnet-4&#10;gpt-*"></textarea>
-            <small class="form-text">Supports wildcards: gpt-*, claude-*, etc. Leave empty to allow all models.</small>
+            <label>Allowed Models</label>
+            <div style="margin-bottom: 10px;">
+                <small class="form-text" style="margin-bottom: 8px; display: block;">Select common patterns or add custom models below:</small>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="gpt-*"> GPT Models (gpt-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="gpt-4*"> GPT-4 (gpt-4*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="claude-*"> Claude (claude-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="claude-sonnet-*"> Claude Sonnet (claude-sonnet-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="gemini-*"> Gemini (gemini-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="o1-*"> O1 Models (o1-*)
+                    </label>
+                </div>
+            </div>
+            <label for="allowedModels">Custom Models (Advanced)</label>
+            <textarea id="allowedModels" rows="3" placeholder="Add custom model names or patterns (one per line)"></textarea>
+            <small class="form-text">Leave all empty to allow all models. Supports wildcards like gpt-*, claude-*, etc.</small>
         </div>
 
         <div class="form-group">
@@ -111,10 +164,18 @@ function showAddAPIKeyDialog() {
             return;
         }
 
+        // Collect selected checkboxes
+        const checkedModels = Array.from(document.querySelectorAll('.model-checkbox:checked'))
+            .map(cb => cb.value);
+
+        // Collect custom models from textarea
         const allowedModelsText = document.getElementById('allowedModels').value.trim();
-        const allowedModels = allowedModelsText
+        const customModels = allowedModelsText
             ? allowedModelsText.split('\n').map(m => m.trim()).filter(m => m)
             : [];
+
+        // Combine and deduplicate
+        const allowedModels = [...new Set([...checkedModels, ...customModels])];
 
         const monthlyQuotas = {};
         document.querySelectorAll('.quota-entry').forEach(entry => {
@@ -153,6 +214,10 @@ function editAPIKey(data) {
     const allowedModels = limit['allowed-models'] || limit.allowedModels || limit.allowed_models || [];
     const monthlyQuotas = limit['monthly-quotas'] || limit.monthlyQuotas || limit.monthly_quotas || {};
 
+    // Separate checkbox patterns from custom models
+    const checkboxPatterns = ['gpt-*', 'gpt-4*', 'claude-*', 'claude-sonnet-*', 'gemini-*', 'o1-*'];
+    const customModels = allowedModels.filter(m => !checkboxPatterns.includes(m));
+
     const quotasHtml = Object.keys(monthlyQuotas).length > 0
         ? Object.entries(monthlyQuotas).map(([model, quota]) => `
             <div class="quota-entry">
@@ -175,9 +240,33 @@ function editAPIKey(data) {
         <h4 style="margin-bottom: 15px;">Access Limits (Optional)</h4>
 
         <div class="form-group">
-            <label for="allowedModels">Allowed Models</label>
-            <textarea id="allowedModels" rows="4" placeholder="Leave empty for all models, or enter one per line:&#10;gpt-4&#10;claude-sonnet-4&#10;gpt-*">${escapeHtml(allowedModels.join('\n'))}</textarea>
-            <small class="form-text">Supports wildcards: gpt-*, claude-*, etc. Leave empty to allow all models.</small>
+            <label>Allowed Models</label>
+            <div style="margin-bottom: 10px;">
+                <small class="form-text" style="margin-bottom: 8px; display: block;">Select common patterns or add custom models below:</small>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="gpt-*" ${allowedModels.includes('gpt-*') ? 'checked' : ''}> GPT Models (gpt-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="gpt-4*" ${allowedModels.includes('gpt-4*') ? 'checked' : ''}> GPT-4 (gpt-4*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="claude-*" ${allowedModels.includes('claude-*') ? 'checked' : ''}> Claude (claude-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="claude-sonnet-*" ${allowedModels.includes('claude-sonnet-*') ? 'checked' : ''}> Claude Sonnet (claude-sonnet-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="gemini-*" ${allowedModels.includes('gemini-*') ? 'checked' : ''}> Gemini (gemini-*)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="model-checkbox" value="o1-*" ${allowedModels.includes('o1-*') ? 'checked' : ''}> O1 Models (o1-*)
+                    </label>
+                </div>
+            </div>
+            <label for="allowedModels">Custom Models (Advanced)</label>
+            <textarea id="allowedModels" rows="3" placeholder="Add custom model names or patterns (one per line)">${escapeHtml(customModels.join('\n'))}</textarea>
+            <small class="form-text">Leave all empty to allow all models. Supports wildcards like gpt-*, claude-*, etc.</small>
         </div>
 
         <div class="form-group">
@@ -195,10 +284,18 @@ function editAPIKey(data) {
             return;
         }
 
+        // Collect selected checkboxes
+        const checkedModels = Array.from(document.querySelectorAll('.model-checkbox:checked'))
+            .map(cb => cb.value);
+
+        // Collect custom models from textarea
         const allowedModelsText = document.getElementById('allowedModels').value.trim();
-        const allowedModels = allowedModelsText
+        const customModels = allowedModelsText
             ? allowedModelsText.split('\n').map(m => m.trim()).filter(m => m)
             : [];
+
+        // Combine and deduplicate
+        const allowedModels = [...new Set([...checkedModels, ...customModels])];
 
         const monthlyQuotas = {};
         document.querySelectorAll('.quota-entry').forEach(entry => {
