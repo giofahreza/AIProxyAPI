@@ -38,6 +38,9 @@ async function loadLogs() {
         // Handle case where logging is disabled - API returns { error: "..." }
         if (logs && typeof logs === 'object' && logs.error) {
             logsDiv.innerHTML = '<div class="alert alert-info">' + escapeHtml(logs.error) + '</div>';
+        } else if (logs && typeof logs === 'object' && Array.isArray(logs.lines) && logs.lines.length > 0) {
+            const text = logs.lines.join('\n');
+            logsDiv.innerHTML = '<pre style="max-height: 600px; overflow-y: auto;">' + escapeHtml(text) + '</pre>';
         } else if (logs && typeof logs === 'string' && logs.trim()) {
             logsDiv.innerHTML = '<pre style="max-height: 600px; overflow-y: auto;">' + escapeHtml(logs) + '</pre>';
         } else {
@@ -94,11 +97,17 @@ async function downloadLogs() {
             showAlert(logs.error, 'warning');
             return;
         }
-        if (!logs || (typeof logs === 'string' && !logs.trim())) {
+        let content = '';
+        if (logs && typeof logs === 'object' && Array.isArray(logs.lines)) {
+            content = logs.lines.join('\n');
+        } else if (typeof logs === 'string') {
+            content = logs;
+        }
+        if (!content.trim()) {
             showAlert('No logs available to download', 'warning');
             return;
         }
-        downloadFile(logs, 'logs.txt', 'text/plain');
+        downloadFile(content, 'logs.txt', 'text/plain');
         showAlert('Logs downloaded successfully!', 'success');
     } catch (error) {
         showAlert('Failed to download logs: ' + error.message, 'error');
