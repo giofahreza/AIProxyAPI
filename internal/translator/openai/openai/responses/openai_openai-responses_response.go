@@ -65,7 +65,10 @@ func ConvertOpenAIChatCompletionsResponseToOpenAIResponses(ctx context.Context, 
 			FuncItemDone:    make(map[int]bool),
 		}
 	}
-	st := (*param).(*oaiToResponsesState)
+	st, ok := (*param).(*oaiToResponsesState)
+	if !ok {
+		return []string{}
+	}
 
 	if bytes.HasPrefix(rawJSON, []byte("data:")) {
 		rawJSON = bytes.TrimSpace(rawJSON[5:])

@@ -119,7 +119,7 @@ func (h *ClaudeCodeAPIHandler) ClaudeCountTokens(c *gin.Context) {
 		cliCancel(errMsg.Error)
 		return
 	}
-	_, _ = c.Writer.Write(resp)
+	handlers.WriteSSE(c, resp)
 	cliCancel()
 }
 
@@ -216,7 +216,7 @@ func (h *ClaudeCodeAPIHandler) handleNonStreamingResponse(c *gin.Context, rawJSO
 		}
 	}
 
-	_, _ = c.Writer.Write(resp)
+	handlers.WriteSSE(c, resp)
 	cliCancel()
 }
 
@@ -252,7 +252,6 @@ func (h *ClaudeCodeAPIHandler) handleStreamingResponse(c *gin.Context, rawJSON [
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
 	}
 
 	// Peek at the first chunk to determine success or failure before setting headers
@@ -289,7 +288,7 @@ func (h *ClaudeCodeAPIHandler) handleStreamingResponse(c *gin.Context, rawJSON [
 
 			// Write the first chunk
 			if len(chunk) > 0 {
-				_, _ = c.Writer.Write(chunk)
+				handlers.WriteSSE(c, chunk)
 				flusher.Flush()
 			}
 
@@ -306,7 +305,7 @@ func (h *ClaudeCodeAPIHandler) forwardClaudeStream(c *gin.Context, flusher http.
 			if len(chunk) == 0 {
 				return
 			}
-			_, _ = c.Writer.Write(chunk)
+			handlers.WriteSSE(c, chunk)
 		},
 		WriteTerminalError: func(errMsg *interfaces.ErrorMessage) {
 			if errMsg == nil {
@@ -319,7 +318,7 @@ func (h *ClaudeCodeAPIHandler) forwardClaudeStream(c *gin.Context, flusher http.
 			c.Status(status)
 
 			errorBytes, _ := json.Marshal(h.toClaudeError(errMsg))
-			_, _ = fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errorBytes)
+			handlers.WriteSSEFormat(c, "event: error\ndata: %s\n\n", errorBytes)
 		},
 	})
 }

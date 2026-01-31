@@ -100,14 +100,22 @@ func ConvertOpenAIResponseToClaude(_ context.Context, _ string, originalRequestR
 	// Check if this is the [DONE] marker
 	rawStr := strings.TrimSpace(string(rawJSON))
 	if rawStr == "[DONE]" {
-		return convertOpenAIDoneToAnthropic((*param).(*ConvertOpenAIResponseToAnthropicParams))
+		p, ok := (*param).(*ConvertOpenAIResponseToAnthropicParams)
+		if !ok {
+			return []string{}
+		}
+		return convertOpenAIDoneToAnthropic(p)
 	}
 
 	streamResult := gjson.GetBytes(originalRequestRawJSON, "stream")
 	if !streamResult.Exists() || (streamResult.Exists() && streamResult.Type == gjson.False) {
 		return convertOpenAINonStreamingToAnthropic(rawJSON)
 	} else {
-		return convertOpenAIStreamingChunkToAnthropic(rawJSON, (*param).(*ConvertOpenAIResponseToAnthropicParams))
+		p, ok := (*param).(*ConvertOpenAIResponseToAnthropicParams)
+		if !ok {
+			return []string{}
+		}
+		return convertOpenAIStreamingChunkToAnthropic(rawJSON, p)
 	}
 }
 

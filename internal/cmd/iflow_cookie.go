@@ -71,7 +71,7 @@ func DoIFlowCookieAuth(cfg *config.Config, options *LoginOptions) {
 		return
 	}
 
-	fmt.Printf("Authentication successful! API key: %s\n", tokenData.APIKey)
+	fmt.Printf("Authentication successful! API key: %s\n", maskAPIKey(tokenData.APIKey))
 	fmt.Printf("Expires at: %s\n", tokenData.Expire)
 	fmt.Printf("Authentication saved to: %s\n", authFilePath)
 }
@@ -95,4 +95,12 @@ func promptForCookie(promptFn func(string) (string, error)) (string, error) {
 func getAuthFilePath(cfg *config.Config, provider, email string) string {
 	fileName := iflow.SanitizeIFlowFileName(email)
 	return fmt.Sprintf("%s/%s-%s-%d.json", cfg.AuthDir, provider, fileName, time.Now().Unix())
+}
+
+// maskAPIKey masks an API key to show only the first 4 and last 4 characters.
+func maskAPIKey(key string) string {
+	if len(key) <= 8 {
+		return "****"
+	}
+	return key[:4] + "****" + key[len(key)-4:]
 }

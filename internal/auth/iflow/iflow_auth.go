@@ -116,7 +116,11 @@ func (ia *IFlowAuth) doTokenRequest(ctx context.Context, req *http.Request) (*IF
 	if err != nil {
 		return nil, fmt.Errorf("iflow token: request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -183,7 +187,11 @@ func (ia *IFlowAuth) FetchUserInfo(ctx context.Context, accessToken string) (*us
 	if err != nil {
 		return nil, fmt.Errorf("iflow api key: request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -354,7 +362,11 @@ func (ia *IFlowAuth) fetchAPIKeyInfo(ctx context.Context, cookie string) (*iFlow
 	if err != nil {
 		return nil, fmt.Errorf("iflow cookie: GET request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
+	}()
 
 	// Handle gzip compression
 	var reader io.Reader = resp.Body
@@ -433,7 +445,11 @@ func (ia *IFlowAuth) RefreshAPIKey(ctx context.Context, cookie, name string) (*i
 	if err != nil {
 		return nil, fmt.Errorf("iflow cookie refresh: POST request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
+	}()
 
 	// Handle gzip compression
 	var reader io.Reader = resp.Body

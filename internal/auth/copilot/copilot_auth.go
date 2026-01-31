@@ -35,7 +35,7 @@ type CopilotAuth struct {
 //   - *CopilotAuth: A new Copilot authentication service instance
 func NewCopilotAuth(cfg *config.Config) *CopilotAuth {
 	return &CopilotAuth{
-		httpClient: util.SetProxy(&cfg.SDKConfig, &http.Client{}),
+		httpClient: util.SetProxy(&cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second}),
 	}
 }
 
@@ -66,7 +66,9 @@ func (ca *CopilotAuth) InitiateDeviceFlow(ctx context.Context) (*DeviceCodeRespo
 		return nil, fmt.Errorf("device code request failed: %w", err)
 	}
 	defer func() {
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)
@@ -118,7 +120,9 @@ func (ca *CopilotAuth) PollForGitHubToken(deviceCode string, interval int) (stri
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
 		if err != nil {
 			fmt.Printf("Polling attempt %d/%d failed: %v\n", attempt+1, maxAttempts, err)
 			time.Sleep(pollInterval)
@@ -199,7 +203,9 @@ func (ca *CopilotAuth) ExchangeGitHubTokenForCopilot(ctx context.Context, github
 		return nil, fmt.Errorf("Copilot token exchange request failed: %w", err)
 	}
 	defer func() {
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)

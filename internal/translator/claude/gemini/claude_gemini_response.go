@@ -73,29 +73,34 @@ func ConvertClaudeResponseToGemini(_ context.Context, modelName string, original
 	// Base Gemini response template with default values
 	template := `{"candidates":[{"content":{"role":"model","parts":[]}}],"usageMetadata":{"trafficType":"PROVISIONED_THROUGHPUT"},"modelVersion":"","createTime":"","responseId":""}`
 
+	p, ok := (*param).(*ConvertAnthropicResponseToGeminiParams)
+	if !ok {
+		return []string{}
+	}
+
 	// Set model version
-	if (*param).(*ConvertAnthropicResponseToGeminiParams).Model != "" {
+	if p.Model != "" {
 		// Map Claude model names back to Gemini model names
-		template, _ = sjson.Set(template, "modelVersion", (*param).(*ConvertAnthropicResponseToGeminiParams).Model)
+		template, _ = sjson.Set(template, "modelVersion", p.Model)
 	}
 
 	// Set response ID and creation time
-	if (*param).(*ConvertAnthropicResponseToGeminiParams).ResponseID != "" {
-		template, _ = sjson.Set(template, "responseId", (*param).(*ConvertAnthropicResponseToGeminiParams).ResponseID)
+	if p.ResponseID != "" {
+		template, _ = sjson.Set(template, "responseId", p.ResponseID)
 	}
 
 	// Set creation time to current time if not provided
-	if (*param).(*ConvertAnthropicResponseToGeminiParams).CreatedAt == 0 {
-		(*param).(*ConvertAnthropicResponseToGeminiParams).CreatedAt = time.Now().Unix()
+	if p.CreatedAt == 0 {
+		p.CreatedAt = time.Now().Unix()
 	}
-	template, _ = sjson.Set(template, "createTime", time.Unix((*param).(*ConvertAnthropicResponseToGeminiParams).CreatedAt, 0).Format(time.RFC3339Nano))
+	template, _ = sjson.Set(template, "createTime", time.Unix(p.CreatedAt, 0).Format(time.RFC3339Nano))
 
 	switch eventType {
 	case "message_start":
 		// Initialize response with message metadata when a new message begins
 		if message := root.Get("message"); message.Exists() {
-			(*param).(*ConvertAnthropicResponseToGeminiParams).ResponseID = message.Get("id").String()
-			(*param).(*ConvertAnthropicResponseToGeminiParams).Model = message.Get("model").String()
+			p.ResponseID = message.Get("id").String()
+			p.Model = message.Get("model").String()
 		}
 		return []string{}
 
@@ -104,11 +109,11 @@ func ConvertClaudeResponseToGemini(_ context.Context, modelName string, original
 		if cb := root.Get("content_block"); cb.Exists() {
 			if cb.Get("type").String() == "tool_use" {
 				idx := int(root.Get("index").Int())
-				if (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames == nil {
-					(*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames = map[int]string{}
+				if p.ToolUseNames == nil {
+					p.ToolUseNames = map[int]string{}
 				}
 				if name := cb.Get("name"); name.Exists() {
-					(*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames[idx] = name.String()
+					p.ToolUseNames[idx] = name.String()
 				}
 			}
 		}
@@ -137,13 +142,13 @@ func ConvertClaudeResponseToGemini(_ context.Context, modelName string, original
 			case "input_json_delta":
 				// Tool use input delta - accumulate partial_json by index for later assembly at content_block_stop
 				idx := int(root.Get("index").Int())
-				if (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs == nil {
-					(*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs = map[int]*strings.Builder{}
+				if p.ToolUseArgs == nil {
+					p.ToolUseArgs = map[int]*strings.Builder{}
 				}
-				b, ok := (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs[idx]
+				b, ok := p.ToolUseArgs[idx]
 				if !ok || b == nil {
 					bb := &strings.Builder{}
-					(*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs[idx] = bb
+					p.ToolUseArgs[idx] = bb
 					b = bb
 				}
 				if pj := delta.Get("partial_json"); pj.Exists() {
@@ -160,12 +165,12 @@ func ConvertClaudeResponseToGemini(_ context.Context, modelName string, original
 		// Claude's content_block_stop often doesn't include content_block payload (see docs/response-claude.txt)
 		// So we finalize using accumulated state captured during content_block_start and input_json_delta.
 		name := ""
-		if (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames != nil {
-			name = (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames[idx]
+		if p.ToolUseNames != nil {
+			name = p.ToolUseNames[idx]
 		}
 		var argsTrim string
-		if (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs != nil {
-			if b := (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs[idx]; b != nil {
+		if p.ToolUseArgs != nil {
+			if b := p.ToolUseArgs[idx]; b != nil {
 				argsTrim = strings.TrimSpace(b.String())
 			}
 		}
@@ -179,13 +184,13 @@ func ConvertClaudeResponseToGemini(_ context.Context, modelName string, original
 			}
 			template, _ = sjson.SetRaw(template, "candidates.0.content.parts.-1", functionCall)
 			template, _ = sjson.Set(template, "candidates.0.finishReason", "STOP")
-			(*param).(*ConvertAnthropicResponseToGeminiParams).LastStorageOutput = template
+			p.LastStorageOutput = template
 			// cleanup used state for this index
-			if (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs != nil {
-				delete((*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseArgs, idx)
+			if p.ToolUseArgs != nil {
+				delete(p.ToolUseArgs, idx)
 			}
-			if (*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames != nil {
-				delete((*param).(*ConvertAnthropicResponseToGeminiParams).ToolUseNames, idx)
+			if p.ToolUseNames != nil {
+				delete(p.ToolUseNames, idx)
 			}
 			return []string{template}
 		}

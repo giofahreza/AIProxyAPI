@@ -74,7 +74,10 @@ func ConvertAntigravityResponseToClaude(_ context.Context, _ string, originalReq
 		}
 	}
 
-	params := (*param).(*Params)
+	params, ok := (*param).(*Params)
+	if !ok {
+		return []string{}
+	}
 
 	if bytes.Equal(rawJSON, []byte("[DONE]")) {
 		output := ""

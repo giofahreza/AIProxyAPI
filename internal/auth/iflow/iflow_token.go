@@ -3,6 +3,7 @@ package iflow
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -35,7 +36,11 @@ func (ts *IFlowTokenStorage) SaveTokenToFile(authFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("iflow token: create file failed: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("warn: failed to close token file: %v", err)
+		}
+	}()
 
 	if err = json.NewEncoder(f).Encode(ts); err != nil {
 		return fmt.Errorf("iflow token: encode token failed: %w", err)

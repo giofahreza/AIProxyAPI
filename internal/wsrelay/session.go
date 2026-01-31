@@ -104,14 +104,19 @@ func (s *session) dispatch(msg Message) {
 		return
 	}
 	if value, ok := s.pending.Load(msg.ID); ok {
-		req := value.(*pendingRequest)
+		req, ok := value.(*pendingRequest)
+		if !ok {
+			return
+		}
 		select {
 		case req.ch <- msg:
 		default:
 		}
 		if msg.Type == MessageTypeHTTPResp || msg.Type == MessageTypeError || msg.Type == MessageTypeStreamEnd {
 			if actual, loaded := s.pending.LoadAndDelete(msg.ID); loaded {
-				actual.(*pendingRequest).close()
+				if pr, ok := actual.(*pendingRequest); ok {
+					pr.close()
+				}
 			}
 		}
 		return
@@ -146,11 +151,15 @@ func (s *session) request(ctx context.Context, msg Message) (<-chan Message, err
 		return nil, fmt.Errorf("wsrelay: duplicate message id %s", msg.ID)
 	}
 	value, _ := s.pending.Load(msg.ID)
-	req := value.(*pendingRequest)
+	req, ok := value.(*pendingRequest)
+	if !ok {
+		return nil, fmt.Errorf("wsrelay: invalid pending request type")
+	}
 	if err := s.send(ctx, msg); err != nil {
 		if actual, loaded := s.pending.LoadAndDelete(msg.ID); loaded {
-			req := actual.(*pendingRequest)
-			req.close()
+			if pr, ok := actual.(*pendingRequest); ok {
+				pr.close()
+			}
 		}
 		return nil, err
 	}
@@ -158,7 +167,9 @@ func (s *session) request(ctx context.Context, msg Message) (<-chan Message, err
 		select {
 		case <-ctx.Done():
 			if actual, loaded := s.pending.LoadAndDelete(msg.ID); loaded {
-				actual.(*pendingRequest).close()
+				if pr, ok := actual.(*pendingRequest); ok {
+					pr.close()
+				}
 			}
 		case <-s.closed:
 		}
@@ -170,8 +181,15 @@ func (s *session) cleanup(cause error) {
 	s.closeOnce.Do(func() {
 		close(s.closed)
 		s.pending.Range(func(key, value any) bool {
-			req := value.(*pendingRequest)
-			msg := Message{ID: key.(string), Type: MessageTypeError, Payload: map[string]any{"error": cause.Error()}}
+			req, ok := value.(*pendingRequest)
+			if !ok {
+				return true
+			}
+			id, ok := key.(string)
+			if !ok {
+				return true
+			}
+			msg := Message{ID: id, Type: MessageTypeError, Payload: map[string]any{"error": cause.Error()}}
 			select {
 			case req.ch <- msg:
 			default:

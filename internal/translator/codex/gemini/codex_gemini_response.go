@@ -58,18 +58,23 @@ func ConvertCodexResponseToGemini(_ context.Context, modelName string, originalR
 	typeResult := rootResult.Get("type")
 	typeStr := typeResult.String()
 
+	p, ok := (*param).(*ConvertCodexResponseToGeminiParams)
+	if !ok {
+		return []string{}
+	}
+
 	// Base Gemini response template
 	template := `{"candidates":[{"content":{"role":"model","parts":[]}}],"usageMetadata":{"trafficType":"PROVISIONED_THROUGHPUT"},"modelVersion":"gemini-2.5-pro","createTime":"2025-08-15T02:52:03.884209Z","responseId":"06CeaPH7NaCU48APvNXDyA4"}`
-	if (*param).(*ConvertCodexResponseToGeminiParams).LastStorageOutput != "" && typeStr == "response.output_item.done" {
-		template = (*param).(*ConvertCodexResponseToGeminiParams).LastStorageOutput
+	if p.LastStorageOutput != "" && typeStr == "response.output_item.done" {
+		template = p.LastStorageOutput
 	} else {
-		template, _ = sjson.Set(template, "modelVersion", (*param).(*ConvertCodexResponseToGeminiParams).Model)
+		template, _ = sjson.Set(template, "modelVersion", p.Model)
 		createdAtResult := rootResult.Get("response.created_at")
 		if createdAtResult.Exists() {
-			(*param).(*ConvertCodexResponseToGeminiParams).CreatedAt = createdAtResult.Int()
-			template, _ = sjson.Set(template, "createTime", time.Unix((*param).(*ConvertCodexResponseToGeminiParams).CreatedAt, 0).Format(time.RFC3339Nano))
+			p.CreatedAt = createdAtResult.Int()
+			template, _ = sjson.Set(template, "createTime", time.Unix(p.CreatedAt, 0).Format(time.RFC3339Nano))
 		}
-		template, _ = sjson.Set(template, "responseId", (*param).(*ConvertCodexResponseToGeminiParams).ResponseID)
+		template, _ = sjson.Set(template, "responseId", p.ResponseID)
 	}
 
 	// Handle function call completion
@@ -101,7 +106,7 @@ func ConvertCodexResponseToGemini(_ context.Context, modelName string, originalR
 			template, _ = sjson.SetRaw(template, "candidates.0.content.parts.-1", functionCall)
 			template, _ = sjson.Set(template, "candidates.0.finishReason", "STOP")
 
-			(*param).(*ConvertCodexResponseToGeminiParams).LastStorageOutput = template
+			p.LastStorageOutput = template
 
 			// Use this return to storage message
 			return []string{}
@@ -111,7 +116,7 @@ func ConvertCodexResponseToGemini(_ context.Context, modelName string, originalR
 	if typeStr == "response.created" { // Handle response creation - set model and response ID
 		template, _ = sjson.Set(template, "modelVersion", rootResult.Get("response.model").String())
 		template, _ = sjson.Set(template, "responseId", rootResult.Get("response.id").String())
-		(*param).(*ConvertCodexResponseToGeminiParams).ResponseID = rootResult.Get("response.id").String()
+		p.ResponseID = rootResult.Get("response.id").String()
 	} else if typeStr == "response.reasoning_summary_text.delta" { // Handle reasoning/thinking content delta
 		part := `{"thought":true,"text":""}`
 		part, _ = sjson.Set(part, "text", rootResult.Get("delta").String())
@@ -129,8 +134,8 @@ func ConvertCodexResponseToGemini(_ context.Context, modelName string, originalR
 		return []string{}
 	}
 
-	if (*param).(*ConvertCodexResponseToGeminiParams).LastStorageOutput != "" {
-		return []string{(*param).(*ConvertCodexResponseToGeminiParams).LastStorageOutput, template}
+	if p.LastStorageOutput != "" {
+		return []string{p.LastStorageOutput, template}
 	} else {
 		return []string{template}
 	}

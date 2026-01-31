@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
@@ -925,12 +926,18 @@ func SaveConfigPreserveComments(configFile string, cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Warnf("config: failed to close file: %v", err)
+		}
+	}()
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err = enc.Encode(&original); err != nil {
-		_ = enc.Close()
+		if closeErr := enc.Close(); closeErr != nil {
+			log.Warnf("config: failed to close encoder: %v", closeErr)
+		}
 		return err
 	}
 	if err = enc.Close(); err != nil {
@@ -987,12 +994,18 @@ func SaveConfigPreserveCommentsUpdateNestedScalar(configFile string, path []stri
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Warnf("config: failed to close file: %v", err)
+		}
+	}()
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err = enc.Encode(&root); err != nil {
-		_ = enc.Close()
+		if closeErr := enc.Close(); closeErr != nil {
+			log.Warnf("config: failed to close encoder: %v", closeErr)
+		}
 		return err
 	}
 	if err = enc.Close(); err != nil {

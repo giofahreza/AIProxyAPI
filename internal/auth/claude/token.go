@@ -6,6 +6,7 @@ package claude
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -62,7 +63,9 @@ func (ts *ClaudeTokenStorage) SaveTokenToFile(authFilePath string) error {
 		return fmt.Errorf("failed to create token file: %w", err)
 	}
 	defer func() {
-		_ = f.Close()
+		if err := f.Close(); err != nil {
+			log.Printf("warn: failed to close token file: %v", err)
+		}
 	}()
 
 	// Encode and write the token data as JSON

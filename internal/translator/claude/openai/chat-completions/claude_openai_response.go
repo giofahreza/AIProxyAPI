@@ -74,31 +74,36 @@ func ConvertClaudeResponseToOpenAI(_ context.Context, modelName string, original
 		template, _ = sjson.Set(template, "model", modelName)
 	}
 
-	// Set response ID and creation time
-	if (*param).(*ConvertAnthropicResponseToOpenAIParams).ResponseID != "" {
-		template, _ = sjson.Set(template, "id", (*param).(*ConvertAnthropicResponseToOpenAIParams).ResponseID)
+	p, ok := (*param).(*ConvertAnthropicResponseToOpenAIParams)
+	if !ok {
+		return []string{}
 	}
-	if (*param).(*ConvertAnthropicResponseToOpenAIParams).CreatedAt > 0 {
-		template, _ = sjson.Set(template, "created", (*param).(*ConvertAnthropicResponseToOpenAIParams).CreatedAt)
+
+	// Set response ID and creation time
+	if p.ResponseID != "" {
+		template, _ = sjson.Set(template, "id", p.ResponseID)
+	}
+	if p.CreatedAt > 0 {
+		template, _ = sjson.Set(template, "created", p.CreatedAt)
 	}
 
 	switch eventType {
 	case "message_start":
 		// Initialize response with message metadata when a new message begins
 		if message := root.Get("message"); message.Exists() {
-			(*param).(*ConvertAnthropicResponseToOpenAIParams).ResponseID = message.Get("id").String()
-			(*param).(*ConvertAnthropicResponseToOpenAIParams).CreatedAt = time.Now().Unix()
+			p.ResponseID = message.Get("id").String()
+			p.CreatedAt = time.Now().Unix()
 
-			template, _ = sjson.Set(template, "id", (*param).(*ConvertAnthropicResponseToOpenAIParams).ResponseID)
+			template, _ = sjson.Set(template, "id", p.ResponseID)
 			template, _ = sjson.Set(template, "model", modelName)
-			template, _ = sjson.Set(template, "created", (*param).(*ConvertAnthropicResponseToOpenAIParams).CreatedAt)
+			template, _ = sjson.Set(template, "created", p.CreatedAt)
 
 			// Set initial role to assistant for the response
 			template, _ = sjson.Set(template, "choices.0.delta.role", "assistant")
 
 			// Initialize tool calls accumulator for tracking tool call progress
-			if (*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator == nil {
-				(*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator = make(map[int]*ToolCallAccumulator)
+			if p.ToolCallsAccumulator == nil {
+				p.ToolCallsAccumulator = make(map[int]*ToolCallAccumulator)
 			}
 		}
 		return []string{template}
@@ -114,11 +119,11 @@ func ConvertClaudeResponseToOpenAI(_ context.Context, modelName string, original
 				toolName := contentBlock.Get("name").String()
 				index := int(root.Get("index").Int())
 
-				if (*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator == nil {
-					(*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator = make(map[int]*ToolCallAccumulator)
+				if p.ToolCallsAccumulator == nil {
+					p.ToolCallsAccumulator = make(map[int]*ToolCallAccumulator)
 				}
 
-				(*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator[index] = &ToolCallAccumulator{
+				p.ToolCallsAccumulator[index] = &ToolCallAccumulator{
 					ID:   toolCallID,
 					Name: toolName,
 				}
@@ -152,8 +157,8 @@ func ConvertClaudeResponseToOpenAI(_ context.Context, modelName string, original
 				// Tool use input delta - accumulate arguments for tool calls
 				if partialJSON := delta.Get("partial_json"); partialJSON.Exists() {
 					index := int(root.Get("index").Int())
-					if (*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator != nil {
-						if accumulator, exists := (*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator[index]; exists {
+					if p.ToolCallsAccumulator != nil {
+						if accumulator, exists := p.ToolCallsAccumulator[index]; exists {
 							accumulator.Arguments.WriteString(partialJSON.String())
 						}
 					}
@@ -171,8 +176,8 @@ func ConvertClaudeResponseToOpenAI(_ context.Context, modelName string, original
 	case "content_block_stop":
 		// End of content block - output complete tool call if it's a tool_use block
 		index := int(root.Get("index").Int())
-		if (*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator != nil {
-			if accumulator, exists := (*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator[index]; exists {
+		if p.ToolCallsAccumulator != nil {
+			if accumulator, exists := p.ToolCallsAccumulator[index]; exists {
 				// Build complete tool call with accumulated arguments
 				arguments := accumulator.Arguments.String()
 				if arguments == "" {
@@ -185,7 +190,7 @@ func ConvertClaudeResponseToOpenAI(_ context.Context, modelName string, original
 				template, _ = sjson.Set(template, "choices.0.delta.tool_calls.0.function.arguments", arguments)
 
 				// Clean up the accumulator for this index
-				delete((*param).(*ConvertAnthropicResponseToOpenAIParams).ToolCallsAccumulator, index)
+				delete(p.ToolCallsAccumulator, index)
 
 				return []string{template}
 			}
@@ -196,8 +201,8 @@ func ConvertClaudeResponseToOpenAI(_ context.Context, modelName string, original
 		// Handle message-level changes including stop reason and usage
 		if delta := root.Get("delta"); delta.Exists() {
 			if stopReason := delta.Get("stop_reason"); stopReason.Exists() {
-				(*param).(*ConvertAnthropicResponseToOpenAIParams).FinishReason = mapAnthropicStopReasonToOpenAI(stopReason.String())
-				template, _ = sjson.Set(template, "choices.0.finish_reason", (*param).(*ConvertAnthropicResponseToOpenAIParams).FinishReason)
+				p.FinishReason = mapAnthropicStopReasonToOpenAI(stopReason.String())
+				template, _ = sjson.Set(template, "choices.0.finish_reason", p.FinishReason)
 			}
 		}
 

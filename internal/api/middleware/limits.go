@@ -84,7 +84,7 @@ func extractModelFromRequest(c *gin.Context) (string, error) {
 	}
 
 	// Read the body
-	bodyBytes, err := io.ReadAll(c.Request.Body)
+	bodyBytes, err := io.ReadAll(io.LimitReader(c.Request.Body, 10<<20))
 	if err != nil {
 		return "", err
 	}

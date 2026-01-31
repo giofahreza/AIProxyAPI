@@ -58,7 +58,10 @@ func ConvertGeminiResponseToOpenAIResponses(_ context.Context, modelName string,
 			FuncCallIDs: make(map[int]string),
 		}
 	}
-	st := (*param).(*geminiToResponsesState)
+	st, ok := (*param).(*geminiToResponsesState)
+	if !ok {
+		return []string{}
+	}
 
 	if bytes.HasPrefix(rawJSON, []byte("data:")) {
 		rawJSON = bytes.TrimSpace(rawJSON[5:])

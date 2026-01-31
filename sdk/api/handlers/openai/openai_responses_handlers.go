@@ -112,7 +112,7 @@ func (h *OpenAIResponsesAPIHandler) handleNonStreamingResponse(c *gin.Context, r
 		h.WriteErrorResponse(c, errMsg)
 		return
 	}
-	_, _ = c.Writer.Write(resp)
+	handlers.WriteSSE(c, resp)
 	return
 
 	// no legacy fallback
@@ -148,7 +148,6 @@ func (h *OpenAIResponsesAPIHandler) handleStreamingResponse(c *gin.Context, rawJ
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
 	}
 
 	// Peek at the first chunk
@@ -175,7 +174,7 @@ func (h *OpenAIResponsesAPIHandler) handleStreamingResponse(c *gin.Context, rawJ
 			if !ok {
 				// Stream closed without data? Send headers and done.
 				setSSEHeaders()
-				_, _ = c.Writer.Write([]byte("\n"))
+				handlers.WriteSSE(c, []byte("\n"))
 				flusher.Flush()
 				cliCancel(nil)
 				return
@@ -186,10 +185,10 @@ func (h *OpenAIResponsesAPIHandler) handleStreamingResponse(c *gin.Context, rawJ
 
 			// Write first chunk logic (matching forwardResponsesStream)
 			if bytes.HasPrefix(chunk, []byte("event:")) {
-				_, _ = c.Writer.Write([]byte("\n"))
+				handlers.WriteSSE(c, []byte("\n"))
 			}
-			_, _ = c.Writer.Write(chunk)
-			_, _ = c.Writer.Write([]byte("\n"))
+			handlers.WriteSSE(c, chunk)
+			handlers.WriteSSE(c, []byte("\n"))
 			flusher.Flush()
 
 			// Continue
@@ -203,10 +202,10 @@ func (h *OpenAIResponsesAPIHandler) forwardResponsesStream(c *gin.Context, flush
 	h.ForwardStream(c, flusher, cancel, data, errs, handlers.StreamForwardOptions{
 		WriteChunk: func(chunk []byte) {
 			if bytes.HasPrefix(chunk, []byte("event:")) {
-				_, _ = c.Writer.Write([]byte("\n"))
+				handlers.WriteSSE(c, []byte("\n"))
 			}
-			_, _ = c.Writer.Write(chunk)
-			_, _ = c.Writer.Write([]byte("\n"))
+			handlers.WriteSSE(c, chunk)
+			handlers.WriteSSE(c, []byte("\n"))
 		},
 		WriteTerminalError: func(errMsg *interfaces.ErrorMessage) {
 			if errMsg == nil {
@@ -221,10 +220,10 @@ func (h *OpenAIResponsesAPIHandler) forwardResponsesStream(c *gin.Context, flush
 				errText = errMsg.Error.Error()
 			}
 			body := handlers.BuildErrorResponseBody(status, errText)
-			_, _ = fmt.Fprintf(c.Writer, "\nevent: error\ndata: %s\n\n", string(body))
+			handlers.WriteSSEFormat(c, "\nevent: error\ndata: %s\n\n", string(body))
 		},
 		WriteDone: func() {
-			_, _ = c.Writer.Write([]byte("\n"))
+			handlers.WriteSSE(c, []byte("\n"))
 		},
 	})
 }

@@ -639,7 +639,7 @@ func (h *BaseAPIHandler) WriteErrorResponse(c *gin.Context, msg *interfaces.Erro
 		c.Writer.Header().Set("Content-Type", "application/json")
 	}
 	c.Status(status)
-	_, _ = c.Writer.Write(body)
+	WriteSSE(c, body)
 }
 
 func (h *BaseAPIHandler) LoggingAPIResponseError(ctx context.Context, err *interfaces.ErrorMessage) {

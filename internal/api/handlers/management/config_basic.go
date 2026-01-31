@@ -179,7 +179,9 @@ func (h *Handler) GetConfigYAML(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	// Write raw bytes as-is
-	_, _ = c.Writer.Write(data)
+	if _, err := c.Writer.Write(data); err != nil {
+		log.Debugf("write error: %v", err)
+	}
 }
 
 // Debug

@@ -869,7 +869,11 @@ func (s *Server) Stop(ctx context.Context) error {
 //   - gin.HandlerFunc: The CORS middleware handler
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "*")
 
@@ -1083,7 +1087,8 @@ func (s *Server) SetWebsocketAuthChangeHandler(fn func(bool, bool)) {
 func AuthMiddleware(manager *sdkaccess.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if manager == nil {
-			c.Next()
+			log.Warn("AuthMiddleware: access manager is nil, rejecting request")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "internal server error: auth not configured"})
 			return
 		}
 

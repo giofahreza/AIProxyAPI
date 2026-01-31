@@ -49,7 +49,10 @@ func ConvertClaudeResponseToOpenAIResponses(ctx context.Context, modelName strin
 	if *param == nil {
 		*param = &claudeToResponsesState{FuncArgsBuf: make(map[int]*strings.Builder), FuncNames: make(map[int]string), FuncCallIDs: make(map[int]string)}
 	}
-	st := (*param).(*claudeToResponsesState)
+	st, ok := (*param).(*claudeToResponsesState)
+	if !ok {
+		return []string{}
+	}
 
 	// Expect `data: {..}` from Claude clients
 	if !bytes.HasPrefix(rawJSON, dataTag) {

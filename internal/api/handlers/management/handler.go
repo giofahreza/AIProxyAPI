@@ -296,13 +296,6 @@ func (h *Handler) RateLimitMiddleware() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
-
-		// Skip rate limiting for local clients
-		if localClient {
-			c.Next()
-			return
-		}
 
 		h.attemptsMu.Lock()
 		ai := h.failedAttempts[clientIP]

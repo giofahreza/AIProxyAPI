@@ -62,10 +62,15 @@ func ConvertCodexResponseToOpenAI(_ context.Context, modelName string, originalR
 
 	typeResult := rootResult.Get("type")
 	dataType := typeResult.String()
+	p, ok := (*param).(*ConvertCliToOpenAIParams)
+	if !ok {
+		return []string{}
+	}
+
 	if dataType == "response.created" {
-		(*param).(*ConvertCliToOpenAIParams).ResponseID = rootResult.Get("response.id").String()
-		(*param).(*ConvertCliToOpenAIParams).CreatedAt = rootResult.Get("response.created_at").Int()
-		(*param).(*ConvertCliToOpenAIParams).Model = rootResult.Get("response.model").String()
+		p.ResponseID = rootResult.Get("response.id").String()
+		p.CreatedAt = rootResult.Get("response.created_at").Int()
+		p.Model = rootResult.Get("response.model").String()
 		return []string{}
 	}
 
@@ -74,10 +79,10 @@ func ConvertCodexResponseToOpenAI(_ context.Context, modelName string, originalR
 		template, _ = sjson.Set(template, "model", modelResult.String())
 	}
 
-	template, _ = sjson.Set(template, "created", (*param).(*ConvertCliToOpenAIParams).CreatedAt)
+	template, _ = sjson.Set(template, "created", p.CreatedAt)
 
 	// Extract and set the response ID.
-	template, _ = sjson.Set(template, "id", (*param).(*ConvertCliToOpenAIParams).ResponseID)
+	template, _ = sjson.Set(template, "id", p.ResponseID)
 
 	// Extract and set usage metadata (token counts).
 	if usageResult := gjson.GetBytes(rawJSON, "response.usage"); usageResult.Exists() {
@@ -110,7 +115,7 @@ func ConvertCodexResponseToOpenAI(_ context.Context, modelName string, originalR
 		}
 	} else if dataType == "response.completed" {
 		finishReason := "stop"
-		if (*param).(*ConvertCliToOpenAIParams).FunctionCallIndex != -1 {
+		if p.FunctionCallIndex != -1 {
 			finishReason = "tool_calls"
 		}
 		template, _ = sjson.Set(template, "choices.0.finish_reason", finishReason)
@@ -124,8 +129,8 @@ func ConvertCodexResponseToOpenAI(_ context.Context, modelName string, originalR
 			}
 
 			// set the index
-			(*param).(*ConvertCliToOpenAIParams).FunctionCallIndex++
-			functionCallItemTemplate, _ = sjson.Set(functionCallItemTemplate, "index", (*param).(*ConvertCliToOpenAIParams).FunctionCallIndex)
+			p.FunctionCallIndex++
+			functionCallItemTemplate, _ = sjson.Set(functionCallItemTemplate, "index", p.FunctionCallIndex)
 
 			template, _ = sjson.SetRaw(template, "choices.0.delta.tool_calls", `[]`)
 			functionCallItemTemplate, _ = sjson.Set(functionCallItemTemplate, "id", itemResult.Get("call_id").String())

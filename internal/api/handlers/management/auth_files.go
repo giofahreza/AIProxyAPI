@@ -932,7 +932,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 		}
 		bodyJSON, _ := json.Marshal(bodyMap)
 
-		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
+		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second})
 		req, _ := http.NewRequestWithContext(ctx, "POST", "https://console.anthropic.com/v1/oauth/token", strings.NewReader(string(bodyJSON)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
@@ -1007,7 +1007,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 
 func (h *Handler) RequestGeminiCLIToken(c *gin.Context) {
 	ctx := context.Background()
-	proxyHTTPClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
+	proxyHTTPClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second})
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, proxyHTTPClient)
 
 	// Optional project ID from query
@@ -1353,7 +1353,7 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 			"redirect_uri":  {"http://localhost:1455/auth/callback"},
 			"code_verifier": {pkceCodes.CodeVerifier},
 		}
-		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
+		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second})
 		req, _ := http.NewRequestWithContext(ctx, "POST", "https://auth.openai.com/oauth/token", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Accept", "application/json")
@@ -1530,7 +1530,7 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 			time.Sleep(500 * time.Millisecond)
 		}
 
-		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
+		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second})
 		form := url.Values{}
 		form.Set("code", authCode)
 		form.Set("client_id", antigravityClientID)

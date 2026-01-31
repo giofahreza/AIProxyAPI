@@ -37,7 +37,7 @@ type CodexAuth struct {
 // It initializes an HTTP client with proxy settings from the provided configuration.
 func NewCodexAuth(cfg *config.Config) *CodexAuth {
 	return &CodexAuth{
-		httpClient: util.SetProxy(&cfg.SDKConfig, &http.Client{}),
+		httpClient: util.SetProxy(&cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second}),
 	}
 }
 
@@ -96,7 +96,9 @@ func (o *CodexAuth) ExchangeCodeForTokens(ctx context.Context, code string, pkce
 		return nil, fmt.Errorf("token exchange request failed: %w", err)
 	}
 	defer func() {
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)
@@ -182,7 +184,9 @@ func (o *CodexAuth) RefreshTokens(ctx context.Context, refreshToken string) (*Co
 		return nil, fmt.Errorf("token refresh request failed: %w", err)
 	}
 	defer func() {
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			log.Warnf("failed to close response body: %v", err)
+		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)

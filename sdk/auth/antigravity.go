@@ -60,7 +60,7 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
 		opts = &LoginOptions{}
 	}
 
-	httpClient := util.SetProxy(&cfg.SDKConfig, &http.Client{})
+	httpClient := util.SetProxy(&cfg.SDKConfig, &http.Client{Timeout: 30 * time.Second})
 
 	state, err := misc.GenerateRandomState()
 	if err != nil {

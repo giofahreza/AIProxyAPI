@@ -61,15 +61,20 @@ func ConvertCliResponseToOpenAI(_ context.Context, _ string, originalRequestRawJ
 		template, _ = sjson.Set(template, "model", modelVersionResult.String())
 	}
 
+	p, ok := (*param).(*convertCliResponseToOpenAIChatParams)
+	if !ok {
+		return []string{}
+	}
+
 	// Extract and set the creation timestamp.
 	if createTimeResult := gjson.GetBytes(rawJSON, "response.createTime"); createTimeResult.Exists() {
 		t, err := time.Parse(time.RFC3339Nano, createTimeResult.String())
 		if err == nil {
-			(*param).(*convertCliResponseToOpenAIChatParams).UnixTimestamp = t.Unix()
+			p.UnixTimestamp = t.Unix()
 		}
-		template, _ = sjson.Set(template, "created", (*param).(*convertCliResponseToOpenAIChatParams).UnixTimestamp)
+		template, _ = sjson.Set(template, "created", p.UnixTimestamp)
 	} else {
-		template, _ = sjson.Set(template, "created", (*param).(*convertCliResponseToOpenAIChatParams).UnixTimestamp)
+		template, _ = sjson.Set(template, "created", p.UnixTimestamp)
 	}
 
 	// Extract and set the response ID.
@@ -139,8 +144,8 @@ func ConvertCliResponseToOpenAI(_ context.Context, _ string, originalRequestRawJ
 				// Handle function call content.
 				hasFunctionCall = true
 				toolCallsResult := gjson.Get(template, "choices.0.delta.tool_calls")
-				functionCallIndex := (*param).(*convertCliResponseToOpenAIChatParams).FunctionIndex
-				(*param).(*convertCliResponseToOpenAIChatParams).FunctionIndex++
+				functionCallIndex := p.FunctionIndex
+				p.FunctionIndex++
 				if toolCallsResult.Exists() && toolCallsResult.IsArray() {
 					functionCallIndex = len(toolCallsResult.Array())
 				} else {

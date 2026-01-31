@@ -97,7 +97,7 @@ func (g *GeminiAuth) GetAuthenticatedClient(ctx context.Context, ts *GeminiToken
 		}
 
 		if transport != nil {
-			proxyClient := &http.Client{Transport: transport}
+			proxyClient := &http.Client{Transport: transport, Timeout: 30 * time.Second}
 			ctx = context.WithValue(ctx, oauth2.HTTPClient, proxyClient)
 		}
 	}

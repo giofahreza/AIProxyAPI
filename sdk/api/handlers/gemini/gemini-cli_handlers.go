@@ -82,7 +82,7 @@ func (h *GeminiCLIAPIHandler) CLIHandler(c *gin.Context) {
 			req.Header[key] = value
 		}
 
-		httpClient := util.SetProxy(h.Cfg, &http.Client{})
+		httpClient := util.SetProxy(h.Cfg, &http.Client{Timeout: 30 * time.Second})
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
@@ -113,7 +113,9 @@ func (h *GeminiCLIAPIHandler) CLIHandler(c *gin.Context) {
 		}
 
 		defer func() {
-			_ = resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Warnf("failed to close response body: %v", err)
+			}
 		}()
 
 		for key, value := range resp.Header {
@@ -124,7 +126,7 @@ func (h *GeminiCLIAPIHandler) CLIHandler(c *gin.Context) {
 			log.Errorf("Failed to read response body: %v", err)
 			return
 		}
-		_, _ = c.Writer.Write(output)
+		handlers.WriteSSE(c, output)
 		c.Set("API_RESPONSE", output)
 	}
 }
@@ -139,7 +141,6 @@ func (h *GeminiCLIAPIHandler) handleInternalStreamGenerateContent(c *gin.Context
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
 	}
 
 	// Get the http.Flusher interface to manually flush the response.
@@ -177,7 +178,7 @@ func (h *GeminiCLIAPIHandler) handleInternalGenerateContent(c *gin.Context, rawJ
 		cliCancel(errMsg.Error)
 		return
 	}
-	_, _ = c.Writer.Write(resp)
+	handlers.WriteSSE(c, resp)
 	cliCancel()
 }
 
@@ -197,13 +198,13 @@ func (h *GeminiCLIAPIHandler) forwardCLIStream(c *gin.Context, flusher http.Flus
 				}
 
 				if !bytes.HasPrefix(chunk, []byte("data:")) {
-					_, _ = c.Writer.Write([]byte("data: "))
+					handlers.WriteSSE(c, []byte("data: "))
 				}
 
-				_, _ = c.Writer.Write(chunk)
-				_, _ = c.Writer.Write([]byte("\n\n"))
+				handlers.WriteSSE(c, chunk)
+				handlers.WriteSSE(c, []byte("\n\n"))
 			} else {
-				_, _ = c.Writer.Write(chunk)
+				handlers.WriteSSE(c, chunk)
 			}
 		},
 		WriteTerminalError: func(errMsg *interfaces.ErrorMessage) {
@@ -220,9 +221,9 @@ func (h *GeminiCLIAPIHandler) forwardCLIStream(c *gin.Context, flusher http.Flus
 			}
 			body := handlers.BuildErrorResponseBody(status, errText)
 			if alt == "" {
-				_, _ = fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", string(body))
+				handlers.WriteSSEFormat(c, "event: error\ndata: %s\n\n", string(body))
 			} else {
-				_, _ = c.Writer.Write(body)
+				handlers.WriteSSE(c, body)
 			}
 		},
 	})

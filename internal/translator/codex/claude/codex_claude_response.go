@@ -100,7 +100,10 @@ func ConvertCodexResponseToClaude(_ context.Context, _ string, originalRequestRa
 		output += fmt.Sprintf("data: %s\n\n", template)
 	} else if typeStr == "response.completed" {
 		template = `{"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}`
-		p := (*param).(*bool)
+		p, ok := (*param).(*bool)
+		if !ok {
+			return []string{}
+		}
 		if *p {
 			template, _ = sjson.Set(template, "delta.stop_reason", "tool_use")
 		} else {

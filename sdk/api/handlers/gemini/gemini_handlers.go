@@ -245,7 +245,6 @@ func (h *GeminiAPIHandler) handleStreamGenerateContent(c *gin.Context, modelName
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
 	}
 
 	// Peek at the first chunk
@@ -286,11 +285,11 @@ func (h *GeminiAPIHandler) handleStreamGenerateContent(c *gin.Context, modelName
 
 			// Write first chunk
 			if alt == "" {
-				_, _ = c.Writer.Write([]byte("data: "))
-				_, _ = c.Writer.Write(chunk)
-				_, _ = c.Writer.Write([]byte("\n\n"))
+				handlers.WriteSSE(c, []byte("data: "))
+				handlers.WriteSSE(c, chunk)
+				handlers.WriteSSE(c, []byte("\n\n"))
 			} else {
-				_, _ = c.Writer.Write(chunk)
+				handlers.WriteSSE(c, chunk)
 			}
 			flusher.Flush()
 
@@ -319,7 +318,7 @@ func (h *GeminiAPIHandler) handleCountTokens(c *gin.Context, modelName string, r
 		cliCancel(errMsg.Error)
 		return
 	}
-	_, _ = c.Writer.Write(resp)
+	handlers.WriteSSE(c, resp)
 	cliCancel()
 }
 
@@ -342,7 +341,7 @@ func (h *GeminiAPIHandler) handleGenerateContent(c *gin.Context, modelName strin
 		cliCancel(errMsg.Error)
 		return
 	}
-	_, _ = c.Writer.Write(resp)
+	handlers.WriteSSE(c, resp)
 	cliCancel()
 }
 
@@ -357,11 +356,11 @@ func (h *GeminiAPIHandler) forwardGeminiStream(c *gin.Context, flusher http.Flus
 		KeepAliveInterval: keepAliveInterval,
 		WriteChunk: func(chunk []byte) {
 			if alt == "" {
-				_, _ = c.Writer.Write([]byte("data: "))
-				_, _ = c.Writer.Write(chunk)
-				_, _ = c.Writer.Write([]byte("\n\n"))
+				handlers.WriteSSE(c, []byte("data: "))
+				handlers.WriteSSE(c, chunk)
+				handlers.WriteSSE(c, []byte("\n\n"))
 			} else {
-				_, _ = c.Writer.Write(chunk)
+				handlers.WriteSSE(c, chunk)
 			}
 		},
 		WriteTerminalError: func(errMsg *interfaces.ErrorMessage) {
@@ -378,9 +377,9 @@ func (h *GeminiAPIHandler) forwardGeminiStream(c *gin.Context, flusher http.Flus
 			}
 			body := handlers.BuildErrorResponseBody(status, errText)
 			if alt == "" {
-				_, _ = fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", string(body))
+				handlers.WriteSSEFormat(c, "event: error\ndata: %s\n\n", string(body))
 			} else {
-				_, _ = c.Writer.Write(body)
+				handlers.WriteSSE(c, body)
 			}
 		},
 	})
