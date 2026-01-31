@@ -147,15 +147,17 @@ func (h *OpenAIAPIHandler) filterModelsByCredentials(models []map[string]any, al
 	}
 
 	// Extract providers from allowed credential IDs
-	// Credential IDs are typically: "anthropic-email.json", "gemini-email.json", etc.
+	// Credential IDs can be: "anthropic-email.json", "email@example.com", "my-cred-name", etc.
 	allowedProviders := make(map[string]bool)
 	for _, credID := range allowedCredentials {
-		provider := extractProviderFromCredentialID(credID)
-		if provider != "" {
+		providers := extractProvidersFromCredentialID(credID)
+		for _, provider := range providers {
 			allowedProviders[strings.ToLower(provider)] = true
 		}
 	}
 
+	// If no providers could be extracted, don't filter (allow all models)
+	// This prevents breaking the API when credential format is unexpected
 	if len(allowedProviders) == 0 {
 		return models
 	}
@@ -177,29 +179,51 @@ func (h *OpenAIAPIHandler) filterModelsByCredentials(models []map[string]any, al
 	return filtered
 }
 
-// extractProviderFromCredentialID extracts the provider name from a credential ID.
-// Examples: "anthropic-user@email.json" -> "anthropic", "gemini-cli-user.json" -> "gemini"
-func extractProviderFromCredentialID(credID string) string {
-	// Remove .json extension if present
+// extractProvidersFromCredentialID extracts all possible provider names from a credential ID.
+// Returns multiple providers if the ID contains provider keywords anywhere in the name.
+// Examples:
+//   "anthropic-user@email.json" -> ["anthropic"]
+//   "my-gemini-account.json" -> ["gemini"]
+//   "user@anthropic.com" -> ["anthropic"]
+func extractProvidersFromCredentialID(credID string) []string {
+	// Remove common file extensions
 	credID = strings.TrimSuffix(credID, ".json")
-
-	// Common provider prefixes
-	providers := []string{"anthropic", "gemini", "codex", "openai", "google", "copilot", "qwen", "iflow", "antigravity"}
+	credID = strings.TrimSuffix(credID, ".txt")
 
 	credLower := strings.ToLower(credID)
-	for _, provider := range providers {
-		if strings.HasPrefix(credLower, provider) {
-			return provider
+
+	// Common provider keywords and their canonical names
+	providerMap := map[string]string{
+		"anthropic": "anthropic",
+		"claude":    "anthropic",
+		"gemini":    "google",
+		"google":    "google",
+		"codex":     "openai",
+		"openai":    "openai",
+		"gpt":       "openai",
+		"copilot":   "copilot",
+		"github":    "copilot",
+		"qwen":      "qwen",
+		"iflow":     "iflow",
+		"antigravity": "google", // antigravity uses Google auth
+	}
+
+	foundProviders := make(map[string]bool)
+
+	// Check if any provider keyword appears anywhere in the credential ID
+	for keyword, provider := range providerMap {
+		if strings.Contains(credLower, keyword) {
+			foundProviders[provider] = true
 		}
 	}
 
-	// Fallback: take the first part before dash
-	parts := strings.Split(credID, "-")
-	if len(parts) > 0 {
-		return parts[0]
+	// Convert map to slice
+	result := make([]string, 0, len(foundProviders))
+	for provider := range foundProviders {
+		result = append(result, provider)
 	}
 
-	return ""
+	return result
 }
 
 // ChatCompletions handles the /v1/chat/completions endpoint.
