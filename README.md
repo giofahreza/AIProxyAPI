@@ -115,6 +115,137 @@ curl ... -d '{"model": "gpt-5-codex", ...}'
 - Multiple server instances with load balancing
 - Integrate with existing auth systems
 
+---
+
+## 🏗️ Architecture & Flow
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        CLI[CLI Tools]
+        WebUI[Web Browser]
+        SDK[Applications<br/>OpenAI SDK]
+    end
+
+    subgraph "AIProxyAPI Gateway"
+        Router[HTTP Router<br/>Gin Framework]
+
+        subgraph "Middleware"
+            Auth[Auth<br/>API Key]
+            Limits[Limits<br/>Quotas]
+        end
+
+        subgraph "Core"
+            Handler[Request<br/>Handler]
+            AuthMgr[Credential<br/>Manager]
+            Registry[Model<br/>Registry]
+        end
+
+        subgraph "Translation"
+            Trans[Protocol<br/>Translator]
+        end
+
+        subgraph "Execution"
+            Exec[Provider<br/>Executor]
+        end
+    end
+
+    subgraph "AI Providers"
+        Claude[Anthropic<br/>Claude]
+        Gemini[Google<br/>Gemini]
+        Codex[GitHub<br/>Codex]
+        Others[Qwen<br/>Copilot<br/>iFlow]
+    end
+
+    CLI --> Router
+    WebUI --> Router
+    SDK --> Router
+
+    Router --> Auth --> Limits --> Handler
+    Handler --> AuthMgr --> Registry
+    AuthMgr --> Trans --> Exec
+
+    Exec --> Claude
+    Exec --> Gemini
+    Exec --> Codex
+    Exec --> Others
+
+    style Router fill:#4A90E2,color:#fff
+    style AuthMgr fill:#E74C3C,color:#fff
+    style Registry fill:#9B59B6,color:#fff
+    style Trans fill:#2ECC71,color:#fff
+```
+
+### Request Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant R as Router
+    participant A as Auth
+    participant L as Limits
+    participant H as Handler
+    participant M as Cred Manager
+    participant P as Provider
+
+    C->>R: POST /v1/chat/completions
+    Note over C,R: {model: "claude-sonnet-4"<br/>messages: [...]}
+
+    R->>A: Validate API Key
+    A-->>R: ✓ Authenticated
+
+    R->>L: Check Limits
+    L->>L: ✓ Model allowed<br/>✓ Quota OK
+    L-->>R: Approved
+
+    R->>H: Route Request
+    H->>M: Get Credential
+    M->>M: Select provider: claude<br/>Pick credential (RoundRobin)
+    M-->>H: OAuth Token
+
+    H->>H: Translate to Claude format
+    H->>P: POST to Claude API
+    P-->>H: Claude Response
+
+    H->>H: Translate to OpenAI format
+    H->>H: Track usage
+    H-->>C: OpenAI-formatted response
+```
+
+### Key Components
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **HTTP Server** | Gin (Go) | Handle HTTP requests, routing, middleware |
+| **Auth Manager** | Custom | Manage credentials, OAuth tokens, selection |
+| **Model Registry** | In-memory | Track available models & quota status |
+| **Limits Enforcer** | Custom | API key quotas & model restrictions |
+| **Translators** | Custom | Convert between OpenAI/Claude/Gemini formats |
+| **Storage** | File/PostgreSQL/Git/S3 | Persist credentials & configuration |
+| **Management UI** | Vanilla JS | Web control panel |
+
+### Tech Stack
+
+**Backend:**
+- **Language:** Go 1.21+
+- **Framework:** Gin (HTTP router)
+- **Auth:** OAuth 2.0 with PKCE, JWT, bcrypt
+- **Storage:** PostgreSQL, Git, S3/MinIO
+- **Logging:** Logrus
+
+**Features:**
+- ✅ Hot reload configuration
+- ✅ WebSocket streaming
+- ✅ Automatic retry with backoff
+- ✅ Load balancing (RoundRobin/FillFirst)
+- ✅ Protocol translation (OpenAI ↔ Claude ↔ Gemini)
+- ✅ Usage tracking & quotas
+- ✅ Multi-provider OAuth
+
+---
+
 ## Quick Start
 
 ### Installation
