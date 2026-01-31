@@ -63,6 +63,15 @@ func (h *OpenAIAPIHandler) OpenAIModels(c *gin.Context) {
 	// Get all available models
 	allModels := h.Models()
 
+	// Check if there are allowed-credentials restrictions from API key limits
+	allowedCreds, hasCredRestriction := c.Get("allowedCredentials")
+	if hasCredRestriction {
+		if allowedCredentials, ok := allowedCreds.([]string); ok && len(allowedCredentials) > 0 {
+			// Filter models to only include those from allowed credentials
+			allModels = h.filterModelsByCredentials(allModels, allowedCredentials)
+		}
+	}
+
 	// Check if there are allowed-providers restrictions from API key limits
 	allowedProvs, hasRestriction := c.Get("allowedProviders")
 	if hasRestriction {
@@ -128,6 +137,69 @@ func (h *OpenAIAPIHandler) filterModelsByProviders(models []map[string]any, allo
 	}
 
 	return filtered
+}
+
+// filterModelsByCredentials filters models to only include those available through allowed credentials.
+// It maps credential IDs (auth file names) to their providers and filters models accordingly.
+func (h *OpenAIAPIHandler) filterModelsByCredentials(models []map[string]any, allowedCredentials []string) []map[string]any {
+	if len(allowedCredentials) == 0 {
+		return models
+	}
+
+	// Extract providers from allowed credential IDs
+	// Credential IDs are typically: "anthropic-email.json", "gemini-email.json", etc.
+	allowedProviders := make(map[string]bool)
+	for _, credID := range allowedCredentials {
+		provider := extractProviderFromCredentialID(credID)
+		if provider != "" {
+			allowedProviders[strings.ToLower(provider)] = true
+		}
+	}
+
+	if len(allowedProviders) == 0 {
+		return models
+	}
+
+	// Filter models by their owned_by field matching allowed providers
+	filtered := make([]map[string]any, 0, len(models))
+	for _, model := range models {
+		ownedBy, ok := model["owned_by"].(string)
+		if !ok || ownedBy == "" {
+			continue
+		}
+
+		// Check if model's provider is in allowed providers
+		if allowedProviders[strings.ToLower(ownedBy)] {
+			filtered = append(filtered, model)
+		}
+	}
+
+	return filtered
+}
+
+// extractProviderFromCredentialID extracts the provider name from a credential ID.
+// Examples: "anthropic-user@email.json" -> "anthropic", "gemini-cli-user.json" -> "gemini"
+func extractProviderFromCredentialID(credID string) string {
+	// Remove .json extension if present
+	credID = strings.TrimSuffix(credID, ".json")
+
+	// Common provider prefixes
+	providers := []string{"anthropic", "gemini", "codex", "openai", "google", "copilot", "qwen", "iflow", "antigravity"}
+
+	credLower := strings.ToLower(credID)
+	for _, provider := range providers {
+		if strings.HasPrefix(credLower, provider) {
+			return provider
+		}
+	}
+
+	// Fallback: take the first part before dash
+	parts := strings.Split(credID, "-")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+
+	return ""
 }
 
 // ChatCompletions handles the /v1/chat/completions endpoint.
