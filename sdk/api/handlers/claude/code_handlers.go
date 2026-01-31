@@ -152,32 +152,19 @@ func (h *ClaudeCodeAPIHandler) filterModelsByProviders(models []map[string]any, 
 		return models
 	}
 
-	// Get model registry for provider lookup
-	modelRegistry := registry.GetGlobalRegistry()
-
 	filtered := make([]map[string]any, 0, len(models))
 	for _, model := range models {
-		modelID, ok := model["id"].(string)
-		if !ok || modelID == "" {
+		// Check the owned_by field to determine the model's provider
+		ownedBy, ok := model["owned_by"].(string)
+		if !ok || ownedBy == "" {
 			continue
 		}
 
-		// Get providers for this model
-		providers := modelRegistry.GetModelProviders(modelID)
-		if len(providers) == 0 {
-			continue
-		}
-
-		// Check if any of the model's providers are in the allowed list
+		// Check if owned_by matches any of the allowed providers (case-insensitive)
 		allowed := false
-		for _, modelProvider := range providers {
-			for _, allowedProvider := range allowedProviders {
-				if strings.EqualFold(modelProvider, allowedProvider) {
-					allowed = true
-					break
-				}
-			}
-			if allowed {
+		for _, allowedProvider := range allowedProviders {
+			if strings.EqualFold(ownedBy, allowedProvider) {
+				allowed = true
 				break
 			}
 		}
