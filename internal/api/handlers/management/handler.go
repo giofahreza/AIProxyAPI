@@ -41,12 +41,21 @@ type Handler struct {
 	envSecret           string
 	logDir              string
 	onLimitsChanged     func([]config.APIKeyLimit)
+	jwtSigningKey       []byte
 }
 
 // NewHandler creates a new management handler instance.
 func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Manager) *Handler {
 	envSecret, _ := os.LookupEnv("MANAGEMENT_PASSWORD")
 	envSecret = strings.TrimSpace(envSecret)
+
+	// Generate JWT signing key
+	signingKey, err := generateSigningKey()
+	if err != nil {
+		// Fallback to empty key; JWT features will be disabled
+		fmt.Fprintf(os.Stderr, "warning: failed to generate JWT signing key: %v\n", err)
+		signingKey = nil
+	}
 
 	return &Handler{
 		cfg:                 cfg,
@@ -57,6 +66,7 @@ func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Man
 		tokenStore:          sdkAuth.GetTokenStore(),
 		allowRemoteOverride: envSecret != "",
 		envSecret:           envSecret,
+		jwtSigningKey:       signingKey,
 	}
 }
 
@@ -188,47 +198,217 @@ func (h *Handler) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		if localClient {
-			if lp := h.localPassword; lp != "" {
-				if subtle.ConstantTimeCompare([]byte(provided), []byte(lp)) == 1 {
-					c.Next()
-					return
+		// Try JWT verification first if token looks like a JWT (contains two dots)
+		if strings.Count(provided, ".") == 2 && h.jwtSigningKey != nil {
+			if _, err := verifyJWT(provided, h.jwtSigningKey, clientIP); err == nil {
+				// Valid JWT token
+				if !localClient {
+					h.clearFailedAttempts(clientIP)
 				}
+				c.Next()
+				return
 			}
+			// JWT verification failed, fall through to password validation
 		}
 
-		if envSecret != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(envSecret)) == 1 {
+		// Password validation
+		if h.validatePassword(provided, clientIP) {
 			if !localClient {
-				h.attemptsMu.Lock()
-				if ai := h.failedAttempts[clientIP]; ai != nil {
-					ai.count = 0
-					ai.blockedUntil = time.Time{}
-				}
-				h.attemptsMu.Unlock()
+				h.clearFailedAttempts(clientIP)
 			}
 			c.Next()
 			return
 		}
 
-		if secretHash == "" || bcrypt.CompareHashAndPassword([]byte(secretHash), []byte(provided)) != nil {
+			// Authentication failed
 			if !localClient {
 				fail()
 			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid management key"})
+	}
+}
+
+// recordFailedAttempt increments failed attempt counter and may trigger IP ban
+func (h *Handler) recordFailedAttempt(clientIP string) {
+	const maxFailures = 5
+	const banDuration = 30 * time.Minute
+
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	ai := h.failedAttempts[clientIP]
+	if ai == nil {
+		ai = &attemptInfo{}
+		h.failedAttempts[clientIP] = ai
+	}
+	ai.count++
+	if ai.count >= maxFailures {
+		ai.blockedUntil = time.Now().Add(banDuration)
+		ai.count = 0
+	}
+}
+
+// clearFailedAttempts resets the failed attempt counter for an IP
+func (h *Handler) clearFailedAttempts(clientIP string) {
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	if ai := h.failedAttempts[clientIP]; ai != nil {
+		ai.count = 0
+		ai.blockedUntil = time.Time{}
+	}
+}
+
+// validatePassword checks if the provided password matches any configured secret.
+// Returns true if valid, false otherwise.
+func (h *Handler) validatePassword(provided, clientIP string) bool {
+	localClient := clientIP == "127.0.0.1" || clientIP == "::1"
+
+	// Check local password for localhost requests
+	if localClient {
+		if lp := h.localPassword; lp != "" {
+			if subtle.ConstantTimeCompare([]byte(provided), []byte(lp)) == 1 {
+				return true
+			}
+		}
+	}
+
+	// Check environment secret
+	if h.envSecret != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(h.envSecret)) == 1 {
+		return true
+	}
+
+	// Check bcrypt hashed secret
+	cfg := h.cfg
+	if cfg != nil {
+		secretHash := cfg.RemoteManagement.SecretKey
+		if secretHash != "" && bcrypt.CompareHashAndPassword([]byte(secretHash), []byte(provided)) == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// RateLimitMiddleware checks if the client IP is banned due to too many failed attempts
+func (h *Handler) RateLimitMiddleware() gin.HandlerFunc {
+	const banDuration = 30 * time.Minute
+
+	return func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
+
+		// Skip rate limiting for local clients
+		if localClient {
+			c.Next()
 			return
 		}
 
-		if !localClient {
-			h.attemptsMu.Lock()
-			if ai := h.failedAttempts[clientIP]; ai != nil {
-				ai.count = 0
-				ai.blockedUntil = time.Time{}
+		h.attemptsMu.Lock()
+		ai := h.failedAttempts[clientIP]
+		if ai != nil && !ai.blockedUntil.IsZero() {
+			if time.Now().Before(ai.blockedUntil) {
+				remaining := time.Until(ai.blockedUntil).Round(time.Second)
+				h.attemptsMu.Unlock()
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("IP banned due to too many failed attempts. Try again in %s", remaining)})
+				return
 			}
-			h.attemptsMu.Unlock()
+			// Ban expired, reset state
+			ai.blockedUntil = time.Time{}
+			ai.count = 0
 		}
+		h.attemptsMu.Unlock()
 
 		c.Next()
 	}
+}
+
+// Login handles JWT session token issuance
+func (h *Handler) Login(c *gin.Context) {
+	clientIP := c.ClientIP()
+	localClient := clientIP == "127.0.0.1" || clientIP == "::1"
+
+	// Check if remote management is allowed
+	cfg := h.cfg
+	var allowRemote bool
+	if cfg != nil {
+		allowRemote = cfg.RemoteManagement.AllowRemote
+	}
+	if h.allowRemoteOverride {
+		allowRemote = true
+	}
+
+	if !localClient && !allowRemote {
+		c.JSON(http.StatusForbidden, gin.H{"error": "remote management disabled"})
+		return
+	}
+
+	// Check if any secret is configured
+	var secretHash string
+	if cfg != nil {
+		secretHash = cfg.RemoteManagement.SecretKey
+	}
+	if secretHash == "" && h.envSecret == "" && h.localPassword == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "remote management key not set"})
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// Reject empty or excessively long passwords
+	password := strings.TrimSpace(req.Password)
+	if password == "" || len(password) > 72 {
+		if !localClient {
+			h.recordFailedAttempt(clientIP)
+		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid management key"})
+		return
+	}
+
+	// Validate password
+	if !h.validatePassword(password, clientIP) {
+		if !localClient {
+			h.recordFailedAttempt(clientIP)
+		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid management key"})
+		return
+	}
+
+	// Clear failed attempts on successful login
+	if !localClient {
+		h.clearFailedAttempts(clientIP)
+	}
+
+	// Generate JWT token
+	if h.jwtSigningKey == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT signing key not available"})
+		return
+	}
+
+	now := time.Now()
+	claims := jwtClaims{
+		IssuedAt:  now.Unix(),
+		ExpiresAt: now.Add(jwtTokenDuration).Unix(),
+		ClientIP:  clientIP,
+	}
+
+	token, err := signJWT(claims, h.jwtSigningKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":      token,
+		"expires_at": claims.ExpiresAt,
+	})
 }
 
 // persist saves the current in-memory config to disk.

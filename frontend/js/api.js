@@ -8,8 +8,34 @@ const API = {
     init(baseUrl, token) {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.token = token;
-        localStorage.setItem('apiBase', this.baseUrl);
-        localStorage.setItem('token', this.token);
+        sessionStorage.setItem('apiBase', this.baseUrl);
+        sessionStorage.setItem('token', this.token);
+    },
+
+    // Login with password and receive JWT token
+    async login(baseUrl, password) {
+        const url = `${baseUrl.replace(/\/$/, '')}/v0/management/login`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password })
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.init(baseUrl, data.token);
+            return data;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
     },
 
     // Generic request method
@@ -32,7 +58,9 @@ const API = {
             });
 
             if (response.status === 401) {
-                // Unauthorized - logout
+                // Unauthorized - clear session and reload
+                sessionStorage.removeItem('apiBase');
+                sessionStorage.removeItem('token');
                 window.location.reload();
                 throw new Error('Unauthorized');
             }

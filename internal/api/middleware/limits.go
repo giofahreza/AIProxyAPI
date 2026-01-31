@@ -37,11 +37,20 @@ func LimitsMiddleware(enforcer *limits.Enforcer) gin.HandlerFunc {
 			return
 		}
 
+		// Set allowed credentials and providers on context first
+		// (so GET /v1/models can filter even without request body)
+		if allowedCreds := enforcer.GetAllowedCredentials(apiKey); len(allowedCreds) > 0 {
+			c.Set("allowedCredentials", allowedCreds)
+		}
+		if allowedProvs := enforcer.GetAllowedProviders(apiKey); len(allowedProvs) > 0 {
+			c.Set("allowedProviders", allowedProvs)
+		}
+
 		// Extract model name from request body
 		modelName, err := extractModelFromRequest(c)
 		if err != nil || modelName == "" {
 			// If we can't extract the model, let it proceed
-			// The actual handler will return a proper error for malformed requests
+			// (This is common for GET requests like /v1/models)
 			c.Next()
 			return
 		}
@@ -53,16 +62,6 @@ func LimitsMiddleware(enforcer *limits.Enforcer) gin.HandlerFunc {
 			c.Data(status, "application/json; charset=utf-8", errorBody)
 			c.Abort()
 			return
-		}
-
-		// Set allowed credentials on context for downstream credential filtering
-		if allowedCreds := enforcer.GetAllowedCredentials(apiKey); len(allowedCreds) > 0 {
-			c.Set("allowedCredentials", allowedCreds)
-		}
-
-		// Set allowed providers on context for downstream provider filtering
-		if allowedProvs := enforcer.GetAllowedProviders(apiKey); len(allowedProvs) > 0 {
-			c.Set("allowedProviders", allowedProvs)
 		}
 
 		c.Next()

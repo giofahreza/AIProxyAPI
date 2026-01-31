@@ -7,9 +7,15 @@ const App = {
 
     // Initialize the application
     init() {
-        // Check if user is logged in
-        const apiBase = localStorage.getItem('apiBase');
-        const token = localStorage.getItem('token');
+        // Migration: remove old localStorage token
+        if (localStorage.getItem('token')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('apiBase');
+        }
+
+        // Check if user is logged in (now using sessionStorage)
+        const apiBase = sessionStorage.getItem('apiBase');
+        const token = sessionStorage.getItem('token');
 
         if (apiBase && token) {
             API.init(apiBase, token);
@@ -74,8 +80,8 @@ const App = {
         const form = document.getElementById('loginForm');
         const errorDiv = document.getElementById('loginError');
 
-        // Pre-fill from localStorage or use current origin
-        const savedApiBase = localStorage.getItem('apiBase') || window.location.origin;
+        // Pre-fill from sessionStorage or use current origin
+        const savedApiBase = sessionStorage.getItem('apiBase') || window.location.origin;
         document.getElementById('apiBase').value = savedApiBase;
 
         form.addEventListener('submit', async (e) => {
@@ -83,13 +89,11 @@ const App = {
             errorDiv.classList.add('hidden');
 
             const apiBase = document.getElementById('apiBase').value.trim();
-            const token = document.getElementById('managementKey').value;
+            const password = document.getElementById('managementKey').value;
 
             try {
-                API.init(apiBase, token);
-
-                // Test the connection
-                await API.getConfig();
+                // Use new login endpoint to exchange password for JWT
+                await API.login(apiBase, password);
 
                 this.showMainScreen();
                 this.loadConfig();
@@ -107,8 +111,8 @@ const App = {
     setupLogout() {
         document.getElementById('logoutBtn').addEventListener('click', () => {
             if (confirm('Are you sure you want to logout?')) {
-                localStorage.removeItem('apiBase');
-                localStorage.removeItem('token');
+                sessionStorage.removeItem('apiBase');
+                sessionStorage.removeItem('token');
                 window.location.reload();
             }
         });

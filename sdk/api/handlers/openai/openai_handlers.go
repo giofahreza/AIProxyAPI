@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -62,6 +63,15 @@ func (h *OpenAIAPIHandler) OpenAIModels(c *gin.Context) {
 	// Get all available models
 	allModels := h.Models()
 
+	// Check if there are allowed-providers restrictions from API key limits
+	allowedProvs, hasRestriction := c.Get("allowedProviders")
+	if hasRestriction {
+		if allowedProviders, ok := allowedProvs.([]string); ok && len(allowedProviders) > 0 {
+			// Filter models to only include those from allowed providers
+			allModels = h.filterModelsByProviders(allModels, allowedProviders)
+		}
+	}
+
 	// Filter to only include the 4 required fields: id, object, created, owned_by
 	filteredModels := make([]map[string]any, len(allModels))
 	for i, model := range allModels {
@@ -87,6 +97,50 @@ func (h *OpenAIAPIHandler) OpenAIModels(c *gin.Context) {
 		"object": "list",
 		"data":   filteredModels,
 	})
+}
+
+// filterModelsByProviders filters models to only include those from allowed providers
+func (h *OpenAIAPIHandler) filterModelsByProviders(models []map[string]any, allowedProviders []string) []map[string]any {
+	if len(allowedProviders) == 0 {
+		return models
+	}
+
+	// Get model registry for provider lookup
+	modelRegistry := registry.GetGlobalRegistry()
+
+	filtered := make([]map[string]any, 0, len(models))
+	for _, model := range models {
+		modelID, ok := model["id"].(string)
+		if !ok || modelID == "" {
+			continue
+		}
+
+		// Get providers for this model
+		providers := modelRegistry.GetModelProviders(modelID)
+		if len(providers) == 0 {
+			continue
+		}
+
+		// Check if any of the model's providers are in the allowed list
+		allowed := false
+		for _, modelProvider := range providers {
+			for _, allowedProvider := range allowedProviders {
+				if strings.EqualFold(modelProvider, allowedProvider) {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				break
+			}
+		}
+
+		if allowed {
+			filtered = append(filtered, model)
+		}
+	}
+
+	return filtered
 }
 
 // ChatCompletions handles the /v1/chat/completions endpoint.

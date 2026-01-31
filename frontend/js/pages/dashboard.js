@@ -295,8 +295,8 @@ function compareVersions(v1, v2) {
 function clearLoginData() {
     if (!confirm('Are you sure you want to clear all login data? You will need to log in again.')) return;
 
-    localStorage.removeItem('apiBase');
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('apiBase');
+    sessionStorage.removeItem('token');
     showAlert('Login data cleared. Reloading...', 'success');
     setTimeout(() => window.location.reload(), 1000);
 }

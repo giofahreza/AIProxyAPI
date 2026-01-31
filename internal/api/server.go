@@ -492,6 +492,13 @@ func (s *Server) registerManagementRoutes() {
 
 	log.Info("management routes registered after secret key configuration")
 
+	// Login endpoint (outside auth middleware, but with rate limiting)
+	loginGroup := s.engine.Group("/v0/management")
+	loginGroup.Use(s.managementAvailabilityMiddleware(), s.mgmt.RateLimitMiddleware())
+	{
+		loginGroup.POST("/login", s.mgmt.Login)
+	}
+
 	mgmt := s.engine.Group("/v0/management")
 	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
 	{

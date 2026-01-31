@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/giofahreza/AIProxyAPI/internal/constant"
@@ -128,9 +129,65 @@ func (h *ClaudeCodeAPIHandler) ClaudeCountTokens(c *gin.Context) {
 // Parameters:
 //   - c: The Gin context for the request.
 func (h *ClaudeCodeAPIHandler) ClaudeModels(c *gin.Context) {
+	// Get all available models
+	allModels := h.Models()
+
+	// Check if there are allowed-providers restrictions from API key limits
+	allowedProvs, hasRestriction := c.Get("allowedProviders")
+	if hasRestriction {
+		if allowedProviders, ok := allowedProvs.([]string); ok && len(allowedProviders) > 0 {
+			// Filter models to only include those from allowed providers
+			allModels = h.filterModelsByProviders(allModels, allowedProviders)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data": h.Models(),
+		"data": allModels,
 	})
+}
+
+// filterModelsByProviders filters models to only include those from allowed providers
+func (h *ClaudeCodeAPIHandler) filterModelsByProviders(models []map[string]any, allowedProviders []string) []map[string]any {
+	if len(allowedProviders) == 0 {
+		return models
+	}
+
+	// Get model registry for provider lookup
+	modelRegistry := registry.GetGlobalRegistry()
+
+	filtered := make([]map[string]any, 0, len(models))
+	for _, model := range models {
+		modelID, ok := model["id"].(string)
+		if !ok || modelID == "" {
+			continue
+		}
+
+		// Get providers for this model
+		providers := modelRegistry.GetModelProviders(modelID)
+		if len(providers) == 0 {
+			continue
+		}
+
+		// Check if any of the model's providers are in the allowed list
+		allowed := false
+		for _, modelProvider := range providers {
+			for _, allowedProvider := range allowedProviders {
+				if strings.EqualFold(modelProvider, allowedProvider) {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				break
+			}
+		}
+
+		if allowed {
+			filtered = append(filtered, model)
+		}
+	}
+
+	return filtered
 }
 
 // handleNonStreamingResponse handles non-streaming content generation requests for Claude models.

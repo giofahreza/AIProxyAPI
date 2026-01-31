@@ -40,9 +40,9 @@ async function loadLogs() {
             logsDiv.innerHTML = '<div class="alert alert-info">' + escapeHtml(logs.error) + '</div>';
         } else if (logs && typeof logs === 'object' && Array.isArray(logs.lines) && logs.lines.length > 0) {
             const text = logs.lines.join('\n');
-            logsDiv.innerHTML = '<pre style="max-height: 600px; overflow-y: auto;">' + escapeHtml(text) + '</pre>';
+            logsDiv.innerHTML = '<pre class="log-pre">' + escapeHtml(text) + '</pre>';
         } else if (logs && typeof logs === 'string' && logs.trim()) {
-            logsDiv.innerHTML = '<pre style="max-height: 600px; overflow-y: auto;">' + escapeHtml(logs) + '</pre>';
+            logsDiv.innerHTML = '<pre class="log-pre">' + escapeHtml(logs) + '</pre>';
         } else {
             logsDiv.innerHTML = '<p class="text-center">No logs available</p>';
         }
