@@ -239,18 +239,38 @@ func sanitizeAntigravityFileName(email string) string {
 	return fmt.Sprintf("antigravity-%s.json", replacer.Replace(email))
 }
 
-func (h *Handler) managementCallbackURL(path string) (string, error) {
+func (h *Handler) managementCallbackURL(c *gin.Context, path string) (string, error) {
 	if h == nil || h.cfg == nil || h.cfg.Port <= 0 {
 		return "", fmt.Errorf("server port is not configured")
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
+
+	// Auto-detect scheme from request (check X-Forwarded-Proto for reverse proxy)
 	scheme := "http"
 	if h.cfg.TLS.Enable {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://127.0.0.1:%d%s", scheme, h.cfg.Port, path), nil
+	if c != nil {
+		if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+			scheme = proto
+		} else if c.Request.TLS != nil {
+			scheme = "https"
+		}
+	}
+
+	// Auto-detect host from request (check X-Forwarded-Host for reverse proxy)
+	host := fmt.Sprintf("127.0.0.1:%d", h.cfg.Port)
+	if c != nil {
+		if forwardedHost := c.GetHeader("X-Forwarded-Host"); forwardedHost != "" {
+			host = forwardedHost
+		} else if c.Request.Host != "" {
+			host = c.Request.Host
+		}
+	}
+
+	return fmt.Sprintf("%s://%s%s", scheme, host, path), nil
 }
 
 func (h *Handler) ListAuthFiles(c *gin.Context) {
@@ -842,15 +862,36 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 
 	RegisterOAuthSession(state, "anthropic")
 
+	// Build proper redirect_uri from request URL (auto-detect host/scheme)
+	callbackURL, errCallback := h.managementCallbackURL(c, "/anthropic/callback")
+	if errCallback != nil {
+		log.WithError(errCallback).Error("failed to build callback URL")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build callback URL"})
+		return
+	}
+
+	// Replace localhost redirect_uri in authURL with actual server callback URL
+	parsedAuthURL, errParse := url.Parse(authURL)
+	if errParse == nil {
+		query := parsedAuthURL.Query()
+		query.Set("redirect_uri", callbackURL)
+		parsedAuthURL.RawQuery = query.Encode()
+		authURL = parsedAuthURL.String()
+	}
+
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
-	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/anthropic/callback")
-		if errTarget != nil {
-			log.WithError(errTarget).Error("failed to compute anthropic callback target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
-			return
-		}
+
+	// Only start callback forwarder for localhost URLs (local CLI usage)
+	// For remote servers, OAuth provider redirects directly to the server endpoint
+	useForwarder := false
+	if parsedCallback, errParseCb := url.Parse(callbackURL); errParseCb == nil {
+		host := parsedCallback.Hostname()
+		useForwarder = (host == "localhost" || host == "127.0.0.1" || host == "::1")
+	}
+
+	if isWebUI && useForwarder {
+		targetURL := callbackURL
 		var errStart error
 		if forwarder, errStart = startCallbackForwarder(anthropicCallbackPort, "anthropic", targetURL); errStart != nil {
 			log.WithError(errStart).Error("failed to start anthropic callback forwarder")
@@ -860,7 +901,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 	}
 
 	go func() {
-		if isWebUI {
+		if isWebUI && useForwarder && forwarder != nil {
 			defer stopCallbackForwarderInstance(anthropicCallbackPort, forwarder)
 		}
 
@@ -916,8 +957,9 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 		code := strings.Split(rawCode, "#")[0]
 
 		// Exchange code for tokens (replicate logic using updated redirect_uri)
-		// Extract client_id from the modified auth URL
+		// Extract client_id and redirect_uri from the modified auth URL
 		clientID := ""
+		redirectURI := callbackURL // Use the same callback URL we set in the auth URL
 		if u2, errP := url.Parse(authURL); errP == nil {
 			clientID = u2.Query().Get("client_id")
 		}
@@ -927,7 +969,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 			"state":         state,
 			"grant_type":    "authorization_code",
 			"client_id":     clientID,
-			"redirect_uri":  "http://localhost:54545/callback",
+			"redirect_uri":  redirectURI,
 			"code_verifier": pkceCodes.CodeVerifier,
 		}
 		bodyJSON, _ := json.Marshal(bodyMap)
@@ -1015,11 +1057,19 @@ func (h *Handler) RequestGeminiCLIToken(c *gin.Context) {
 
 	fmt.Println("Initializing Google authentication...")
 
+	// Build proper redirect_uri from request URL (auto-detect host/scheme)
+	callbackURL, errCallback := h.managementCallbackURL(c, "/google/callback")
+	if errCallback != nil {
+		log.WithError(errCallback).Error("failed to build callback URL")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build callback URL"})
+		return
+	}
+
 	// OAuth2 configuration (mirrors internal/auth/gemini)
 	conf := &oauth2.Config{
 		ClientID:     "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
 		ClientSecret: "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",
-		RedirectURL:  "http://localhost:8085/oauth2callback",
+		RedirectURL:  callbackURL,
 		Scopes: []string{
 			"https://www.googleapis.com/auth/cloud-platform",
 			"https://www.googleapis.com/auth/userinfo.email",
@@ -1036,13 +1086,17 @@ func (h *Handler) RequestGeminiCLIToken(c *gin.Context) {
 
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
-	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/google/callback")
-		if errTarget != nil {
-			log.WithError(errTarget).Error("failed to compute gemini callback target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
-			return
-		}
+
+	// Only start callback forwarder for localhost URLs (local CLI usage)
+	// For remote servers, OAuth provider redirects directly to the server endpoint
+	useForwarder := false
+	if parsedCallback, errParseCb := url.Parse(callbackURL); errParseCb == nil {
+		host := parsedCallback.Hostname()
+		useForwarder = (host == "localhost" || host == "127.0.0.1" || host == "::1")
+	}
+
+	if isWebUI && useForwarder {
+		targetURL := callbackURL
 		var errStart error
 		if forwarder, errStart = startCallbackForwarder(geminiCallbackPort, "gemini", targetURL); errStart != nil {
 			log.WithError(errStart).Error("failed to start gemini callback forwarder")
@@ -1052,7 +1106,7 @@ func (h *Handler) RequestGeminiCLIToken(c *gin.Context) {
 	}
 
 	go func() {
-		if isWebUI {
+		if isWebUI && useForwarder && forwarder != nil {
 			defer stopCallbackForwarderInstance(geminiCallbackPort, forwarder)
 		}
 
@@ -1279,17 +1333,38 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 		return
 	}
 
+	// Build proper redirect_uri from request URL (auto-detect host/scheme)
+	callbackURL, errCallback := h.managementCallbackURL(c, "/codex/callback")
+	if errCallback != nil {
+		log.WithError(errCallback).Error("failed to build callback URL")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build callback URL"})
+		return
+	}
+
+	// Replace localhost redirect_uri in authURL with actual server callback URL
+	parsedAuthURL, errParse := url.Parse(authURL)
+	if errParse == nil {
+		query := parsedAuthURL.Query()
+		query.Set("redirect_uri", callbackURL)
+		parsedAuthURL.RawQuery = query.Encode()
+		authURL = parsedAuthURL.String()
+	}
+
 	RegisterOAuthSession(state, "codex")
 
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
-	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/codex/callback")
-		if errTarget != nil {
-			log.WithError(errTarget).Error("failed to compute codex callback target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
-			return
-		}
+
+	// Only start callback forwarder for localhost URLs (local CLI usage)
+	// For remote servers, OAuth provider redirects directly to the server endpoint
+	useForwarder := false
+	if parsedCallback, errParseCb := url.Parse(callbackURL); errParseCb == nil {
+		host := parsedCallback.Hostname()
+		useForwarder = (host == "localhost" || host == "127.0.0.1" || host == "::1")
+	}
+
+	if isWebUI && useForwarder {
+		targetURL := callbackURL
 		var errStart error
 		if forwarder, errStart = startCallbackForwarder(codexCallbackPort, "codex", targetURL); errStart != nil {
 			log.WithError(errStart).Error("failed to start codex callback forwarder")
@@ -1299,7 +1374,7 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 	}
 
 	go func() {
-		if isWebUI {
+		if isWebUI && useForwarder && forwarder != nil {
 			defer stopCallbackForwarderInstance(codexCallbackPort, forwarder)
 		}
 
@@ -1345,12 +1420,12 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 		if u2, errP := url.Parse(authURL); errP == nil {
 			clientID = u2.Query().Get("client_id")
 		}
-		// Exchange code for tokens with redirect equal to mgmtRedirect
+		// Exchange code for tokens with redirect equal to callbackURL
 		form := url.Values{
 			"grant_type":    {"authorization_code"},
 			"client_id":     {clientID},
 			"code":          {code},
-			"redirect_uri":  {"http://localhost:1455/auth/callback"},
+			"redirect_uri":  {callbackURL},
 			"code_verifier": {pkceCodes.CodeVerifier},
 		}
 		httpClient := util.SetProxy(&h.cfg.SDKConfig, &http.Client{})
@@ -1457,13 +1532,19 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", antigravityCallbackPort)
+	// Build proper redirect_uri from request URL (auto-detect host/scheme)
+	callbackURL, errCallback := h.managementCallbackURL(c, "/antigravity/callback")
+	if errCallback != nil {
+		log.WithError(errCallback).Error("failed to build callback URL")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build callback URL"})
+		return
+	}
 
 	params := url.Values{}
 	params.Set("access_type", "offline")
 	params.Set("client_id", antigravityClientID)
 	params.Set("prompt", "consent")
-	params.Set("redirect_uri", redirectURI)
+	params.Set("redirect_uri", callbackURL)
 	params.Set("response_type", "code")
 	params.Set("scope", strings.Join(antigravityScopes, " "))
 	params.Set("state", state)
@@ -1473,13 +1554,17 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
-	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/antigravity/callback")
-		if errTarget != nil {
-			log.WithError(errTarget).Error("failed to compute antigravity callback target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
-			return
-		}
+
+	// Only start callback forwarder for localhost URLs (local CLI usage)
+	// For remote servers, OAuth provider redirects directly to the server endpoint
+	useForwarder := false
+	if parsedCallback, errParseCb := url.Parse(callbackURL); errParseCb == nil {
+		host := parsedCallback.Hostname()
+		useForwarder = (host == "localhost" || host == "127.0.0.1" || host == "::1")
+	}
+
+	if isWebUI && useForwarder {
+		targetURL := callbackURL
 		var errStart error
 		if forwarder, errStart = startCallbackForwarder(antigravityCallbackPort, "antigravity", targetURL); errStart != nil {
 			log.WithError(errStart).Error("failed to start antigravity callback forwarder")
@@ -1489,7 +1574,7 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 	}
 
 	go func() {
-		if isWebUI {
+		if isWebUI && useForwarder && forwarder != nil {
 			defer stopCallbackForwarderInstance(antigravityCallbackPort, forwarder)
 		}
 
@@ -1535,7 +1620,7 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 		form.Set("code", authCode)
 		form.Set("client_id", antigravityClientID)
 		form.Set("client_secret", antigravityClientSecret)
-		form.Set("redirect_uri", redirectURI)
+		form.Set("redirect_uri", callbackURL)
 		form.Set("grant_type", "authorization_code")
 
 		req, errNewRequest := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/token", strings.NewReader(form.Encode()))
@@ -1937,19 +2022,42 @@ func (h *Handler) RequestIFlowToken(c *gin.Context) {
 
 	state := fmt.Sprintf("ifl-%d", time.Now().UnixNano())
 	authSvc := iflowauth.NewIFlowAuth(h.cfg)
-	authURL, redirectURI := authSvc.AuthorizationURL(state, iflowauth.CallbackPort)
+
+	// Build proper redirect_uri from request URL (auto-detect host/scheme)
+	callbackURL, errCallback := h.managementCallbackURL(c, "/iflow/callback")
+	if errCallback != nil {
+		log.WithError(errCallback).Error("failed to build callback URL")
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "error": "failed to build callback URL"})
+		return
+	}
+
+	// Generate auth URL with localhost first, then replace redirect_uri
+	authURL, _ := authSvc.AuthorizationURL(state, iflowauth.CallbackPort)
+
+	// Replace localhost redirect_uri in authURL with actual server callback URL
+	parsedAuthURL, errParse := url.Parse(authURL)
+	if errParse == nil {
+		query := parsedAuthURL.Query()
+		query.Set("redirect", callbackURL)
+		parsedAuthURL.RawQuery = query.Encode()
+		authURL = parsedAuthURL.String()
+	}
 
 	RegisterOAuthSession(state, "iflow")
 
 	isWebUI := isWebUIRequest(c)
 	var forwarder *callbackForwarder
-	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/iflow/callback")
-		if errTarget != nil {
-			log.WithError(errTarget).Error("failed to compute iflow callback target")
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "error": "callback server unavailable"})
-			return
-		}
+
+	// Only start callback forwarder for localhost URLs (local CLI usage)
+	// For remote servers, OAuth provider redirects directly to the server endpoint
+	useForwarder := false
+	if parsedCallback, errParseCb := url.Parse(callbackURL); errParseCb == nil {
+		host := parsedCallback.Hostname()
+		useForwarder = (host == "localhost" || host == "127.0.0.1" || host == "::1")
+	}
+
+	if isWebUI && useForwarder {
+		targetURL := callbackURL
 		var errStart error
 		if forwarder, errStart = startCallbackForwarder(iflowauth.CallbackPort, "iflow", targetURL); errStart != nil {
 			log.WithError(errStart).Error("failed to start iflow callback forwarder")
@@ -1959,7 +2067,7 @@ func (h *Handler) RequestIFlowToken(c *gin.Context) {
 	}
 
 	go func() {
-		if isWebUI {
+		if isWebUI && useForwarder && forwarder != nil {
 			defer stopCallbackForwarderInstance(iflowauth.CallbackPort, forwarder)
 		}
 		fmt.Println("Waiting for authentication...")
@@ -2002,7 +2110,7 @@ func (h *Handler) RequestIFlowToken(c *gin.Context) {
 			return
 		}
 
-		tokenData, errExchange := authSvc.ExchangeCodeForTokens(ctx, code, redirectURI)
+		tokenData, errExchange := authSvc.ExchangeCodeForTokens(ctx, code, callbackURL)
 		if errExchange != nil {
 			SetOAuthSessionError(state, "Authentication failed")
 			fmt.Printf("Authentication failed: %v\n", errExchange)
