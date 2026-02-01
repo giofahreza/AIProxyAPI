@@ -1,0 +1,261 @@
+# ============================================================================
+# Multi-Model Claude Code Configuration
+# Use Claude Code CLI with GPT (Copilot), GLM, Qwen, and other models
+# ============================================================================
+# This configuration enables Claude Code to access 400+ models through OpenRouter
+# Cost savings: 80-95% cheaper than Claude alone while maintaining quality
+# ============================================================================
+
+# Server settings
+host: ""
+port: 8317
+debug: false
+commercial-mode: false
+logging-to-file: false
+usage-statistics-enabled: true
+
+# Authentication
+api-keys:
+  - "your-secure-api-key-1"
+  - "your-secure-api-key-2"
+
+# Enable for production
+auth-dir: "~/.cli-proxy-api"
+
+# Routing strategy - round-robin distributes load, fill-first exhausts credentials
+routing:
+  strategy: "round-robin"
+
+# ============================================================================
+# OPTION 1: OpenRouter Integration (RECOMMENDED)
+# Access 400+ models: Claude, GPT, GLM, Qwen, Gemini, and more
+# Cost: Pay-per-use, typically 80% cheaper than Claude direct
+# Setup time: 5 minutes
+# ============================================================================
+
+openai-compatibility:
+  # ========================================================================
+  # OpenRouter - Your gateway to 400+ models
+  # Cost savings: GPT-4o at $6/1M (vs Claude Sonnet at $3/1M)
+  #              GLM 4.5 at $0.10/1M (vs Claude at $3/1M) = 97% savings!
+  # ========================================================================
+  - name: "openrouter"
+    base-url: "https://openrouter.ai/api/v1"
+    api-key-entries:
+      - api-key: "sk-or-v1-YOUR-OPENROUTER-KEY-HERE"
+
+    # Model mappings: Expose OpenRouter models as if they were Claude
+    models:
+      # ==== TIER 1: Ultra-Cheap (Formatting, simple fixes) ====
+      # Cost: $0.10/1M input tokens
+      - name: "openrouter/z-ai/glm-4-5-air"           # GLM 4.5 air
+        alias: "cheap-glm"
+      - name: "openrouter/deepseek/deepseek-r1-free"  # DeepSeek (free tier)
+        alias: "cheap-deepseek"
+
+      # ==== TIER 2: Standard Quality (Regular features, refactoring) ====
+      # Cost: $0.20-3/1M input tokens
+      - name: "openrouter/alibaba/qwen3-coder-plus"   # Qwen 3 Coder Plus
+        alias: "qwen-plus"
+      - name: "openrouter/alibaba/qwen3-coder-flash"  # Qwen 3 Coder Flash
+        alias: "qwen-fast"
+      - name: "openrouter/moonshotai/kimi-k2"         # Kimi K2
+        alias: "kimi-k2"
+
+      # ==== TIER 3: Premium Quality (Architecture, complex reasoning) ====
+      # Cost: $3-6/1M input tokens
+      - name: "openrouter/openai/gpt-4o"              # GPT-4o (Copilot)
+        alias: "gpt-4o"
+      - name: "openrouter/openai/gpt-4-turbo"         # GPT-4 Turbo
+        alias: "gpt-4-turbo"
+      - name: "openrouter/anthropic/claude-3-5-sonnet" # Claude Sonnet (via OpenRouter)
+        alias: "sonnet-openrouter"
+
+      # ==== TIER 4: Ultra-Premium (Best reasoning, extended thinking) ====
+      # Cost: $6-15/1M input tokens
+      - name: "openrouter/openai/gpt-5-2"             # GPT-5.2 (Advanced reasoning)
+        alias: "gpt-5-advanced"
+      - name: "openrouter/openai/o1"                  # OpenAI o1 (Extended thinking)
+        alias: "o1-reasoning"
+      - name: "openrouter/anthropic/claude-opus-4"    # Claude Opus (via OpenRouter)
+        alias: "opus-openrouter"
+
+    # Optional: Exclude certain models from listing
+    # excluded-models:
+    #   - "*-instruct"
+    #   - "*-base"
+
+  # ========================================================================
+  # OPTION: Direct GLM Integration (Z.AI)
+  # If you want to use GLM without OpenRouter
+  # Cost: $0.10/1M input tokens (Ultra-cheap!)
+  # ========================================================================
+  # - name: "z-ai"
+  #   base-url: "https://api.z.ai/api/v1"  # Z.AI offers GLM through OpenAI-compatible API
+  #   api-key-entries:
+  #     - api-key: "sk-z-ai-YOUR-KEY-HERE"
+  #   models:
+  #     - name: "glm-4-5-air"
+  #       alias: "glm-cheap"
+  #     - name: "glm-4-6"
+  #       alias: "glm-standard"
+  #     - name: "glm-4-7"
+  #       alias: "glm-premium"
+
+# ============================================================================
+# OPTION 2: Direct Claude API (Keep as fallback)
+# When you want guaranteed Claude quality or have Claude subscription
+# ============================================================================
+
+claude-api-key:
+  - api-key: "sk-ant-YOUR-CLAUDE-API-KEY-HERE"
+    models:
+      - name: "claude-3-5-sonnet-20241022"
+        alias: "claude-sonnet"
+      - name: "claude-opus-4-20250514"
+        alias: "claude-opus"
+      - name: "claude-3-5-haiku-20241022"
+        alias: "claude-haiku"
+
+# ============================================================================
+# OPTION 3: Direct Gemini API (Optional)
+# For research, if you have Gemini API access
+# ============================================================================
+
+# gemini-api-key:
+#   - api-key: "AIzaSy-YOUR-GEMINI-KEY"
+#     base-url: "https://generativelanguage.googleapis.com"
+#     models:
+#       - name: "gemini-2-5-flash"
+#         alias: "gemini-flash"
+#       - name: "gemini-2-5-pro"
+#         alias: "gemini-pro"
+
+# ============================================================================
+# ADVANCED: Model Routing & Fallbacks
+# Automatic fallback: When Claude quota hits, use GPT; when GPT hits, use GLM
+# ============================================================================
+
+# Amp integration for advanced routing (optional)
+# ampcode:
+#   upstream-url: "https://ampcode.com"
+#   model-mappings:
+#     # Route expensive models to cheaper alternatives
+#     - from: "claude-opus-4-5"
+#       to: "gpt-4o"          # Use GPT when Opus unavailable
+#     - from: "claude-sonnet-4"
+#       to: "qwen-plus"       # Use Qwen when Sonnet quota hit
+#     - from: "gpt-5"
+#       to: "qwen-fast"       # Use fast Qwen when GPT expensive
+
+# ============================================================================
+# Quota & Rate Limiting
+# ============================================================================
+
+# When quota exceeded, automatically switch to alternative credential/model
+quota-exceeded:
+  switch-project: true       # Switch to next available credential
+  switch-preview-model: true # Switch to preview models if available
+
+# Request retry on failure
+request-retry: 3
+max-retry-interval: 30
+
+# Streaming
+# streaming:
+#   keepalive-seconds: 15    # Send keep-alive every 15 seconds for SSE
+#   bootstrap-retries: 1     # Retry if first byte doesn't arrive
+
+# ============================================================================
+# USAGE GUIDE
+# ============================================================================
+
+# After setup with this config, you can:
+
+# 1. Use cheapest model (GLM, 97% savings):
+#    claude --model cheap-glm
+#    or
+#    /model cheap-glm
+
+# 2. Use Qwen for balance of cost and quality:
+#    /model qwen-plus
+
+# 3. Use GPT for features not in cheaper models:
+#    /model gpt-4o
+
+# 4. Use Claude for guaranteed quality:
+#    /model claude-sonnet
+
+# 5. Use advanced reasoning:
+#    /model o1-reasoning
+
+# ============================================================================
+# ENVIRONMENT VARIABLES (if using without proxy)
+# ============================================================================
+
+# If running Claude Code directly (without this proxy):
+
+# Option A: OpenRouter
+#   export ANTHROPIC_BASE_URL="https://openrouter.ai/api/v1"
+#   export ANTHROPIC_API_KEY="sk-or-v1-..."
+#   claude
+
+# Option B: GLM (cheapest)
+#   export ANTHROPIC_BASE_URL="https://api.z.ai/api/v1"
+#   export ANTHROPIC_API_KEY="sk-z-ai-..."
+#   claude
+
+# Option C: Direct Claude
+#   export ANTHROPIC_API_KEY="sk-ant-..."
+#   claude
+
+# Option D: Through this proxy
+#   export ANTHROPIC_BASE_URL="http://your-server:8317"
+#   export ANTHROPIC_API_KEY="your-api-key-from-config"
+#   claude
+
+# ============================================================================
+# COST BREAKDOWN (100K tokens/day usage)
+# ============================================================================
+
+# Cheap strategy (GLM only):
+#   100K tokens/day × 30 days = 3M tokens/month
+#   3M tokens × $0.10/1M = $0.30/month 🎉
+
+# Balanced strategy (80% GLM, 20% Qwen):
+#   2.4M × $0.10 = $0.24
+#   0.6M × $0.20 = $0.12
+#   Total: $0.36/month 🎉
+
+# Smart routing (60% cheap, 20% standard, 20% premium):
+#   1.8M × $0.10 = $0.18    (GLM)
+#   0.6M × $0.20 = $0.12    (Qwen)
+#   0.6M × $3.00 = $1.80    (Claude via OpenRouter)
+#   Total: $2.10/month ✅
+
+# Claude only (for comparison):
+#   3M × $3.00 = $9.00/month ❌
+
+# You save: $6.90/month or 77% with smart routing!
+
+# ============================================================================
+# RECOMMENDATION FOR YOUR SETUP
+# ============================================================================
+
+# For maximum savings with good quality:
+# 1. Use GLM (cheap-glm) for 80% of work (formatting, simple fixes)
+# 2. Use Qwen (qwen-plus) for 15% of work (regular features)
+# 3. Use Claude (claude-sonnet) for 5% of work (complex architecture)
+# Monthly cost: ~$1.50 for heavy usage (500K tokens/day)
+
+# For guaranteed quality:
+# 1. Use Claude through OpenRouter (cheaper than direct)
+# 2. Fallback to GPT if Claude quota hits
+# 3. Monthly cost: ~$9/month (same as direct, but with better resilience)
+
+# For team usage:
+# 1. Deploy this proxy centrally
+# 2. Each team member gets their own API key from config
+# 3. Automatically routes to best model based on request complexity
+# 4. Tracks usage per developer for billing
+

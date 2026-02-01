@@ -68,11 +68,24 @@ func createReverseProxy(upstreamURL string, secretSource SecretSource) (*httputi
 		originalDirector(req)
 		req.Host = parsed.Host
 
-		// Remove client's Authorization header - it was only used for CLI Proxy API authentication
-		// We will set our own Authorization using the configured upstream-api-key
-		req.Header.Del("Authorization")
-		req.Header.Del("X-Api-Key")
-		req.Header.Del("X-Goog-Api-Key")
+		// Check if this is a direct API request (Claude Code, OpenAI SDK, etc.)
+		// Direct API requests have Authorization headers with provider-specific tokens
+		// They should be passed through to the actual API, not replaced with upstream-api-key
+		existingAuth := req.Header.Get("Authorization")
+		isDirectAPIRequest := existingAuth != "" && (
+			strings.HasPrefix(existingAuth, "Bearer sk-ant-") || // Claude API keys
+			strings.HasPrefix(existingAuth, "Bearer sk-proj-") || // OpenAI API keys
+			strings.HasPrefix(existingAuth, "Bearer ") || // Generic Bearer tokens (could be custom keys)
+			strings.HasPrefix(existingAuth, "ApiKey ")) // Gemini format
+
+		// Only remove Authorization header for Amp/OAuth clients (not direct API requests)
+		// Amp OAuth clients don't have valid provider API keys, so we replace with upstream-api-key
+		if !isDirectAPIRequest {
+			req.Header.Del("Authorization")
+			req.Header.Del("X-Api-Key")
+			req.Header.Del("X-Goog-Api-Key")
+		}
+		// If this IS a direct API request, preserve the Authorization header as-is
 
 		// Remove query-based credentials if they match the authenticated client API key.
 		// This prevents leaking client auth material to the Amp upstream while avoiding
@@ -90,12 +103,16 @@ func createReverseProxy(upstreamURL string, secretSource SecretSource) (*httputi
 		// Users going through ampcode.com proxy are paying for the service and should get all features
 		// including 1M context window (context-1m-2025-08-07)
 
-		// Inject API key from secret source (only uses upstream-api-key from config)
-		if key, err := secretSource.Get(req.Context()); err == nil && key != "" {
-			req.Header.Set("X-Api-Key", key)
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
-		} else if err != nil {
-			log.Warnf("amp secret source error (continuing without auth): %v", err)
+		// Only inject API key from secret source for non-direct-API requests
+		// Direct API requests already have their own authentication
+		if !isDirectAPIRequest {
+			// Inject API key from secret source (only uses upstream-api-key from config)
+			if key, err := secretSource.Get(req.Context()); err == nil && key != "" {
+				req.Header.Set("X-Api-Key", key)
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
+			} else if err != nil {
+				log.Warnf("amp secret source error (continuing without auth): %v", err)
+			}
 		}
 	}
 
@@ -197,15 +214,23 @@ func createReverseProxy(upstreamURL string, secretSource SecretSource) (*httputi
 	return proxy, nil
 }
 
-// isStreamingResponse detects if the response is streaming (SSE only)
+// isStreamingResponse detects if the response is streaming (SSE or multipart events)
 // Note: We only treat text/event-stream as streaming. Chunked transfer encoding
 // is a transport-level detail and doesn't mean we can't decompress the full response.
 // Many JSON APIs use chunked encoding for normal responses.
+//
+// Streaming responses (SSE) should bypass response decompression as they're
+// typically sent with Transfer-Encoding: chunked for real-time delivery.
 func isStreamingResponse(resp *http.Response) bool {
 	contentType := resp.Header.Get("Content-Type")
 
-	// Only Server-Sent Events are true streaming responses
+	// Server-Sent Events (Claude Code, OpenAI streaming, Gemini streaming)
 	if strings.Contains(contentType, "text/event-stream") {
+		return true
+	}
+
+	// Multipart streaming (some models use this for streaming responses)
+	if strings.Contains(contentType, "multipart/") {
 		return true
 	}
 
