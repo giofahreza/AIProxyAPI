@@ -16,6 +16,9 @@ const (
 	// Claude represents the Anthropic Claude provider identifier.
 	Claude = "claude"
 
+	// Anthropic represents the Anthropic API provider identifier.
+	Anthropic = "anthropic"
+
 	// OpenAI represents the OpenAI provider identifier.
 	OpenAI = "openai"
 

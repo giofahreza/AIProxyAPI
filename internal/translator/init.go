@@ -23,6 +23,7 @@ import (
 	_ "github.com/giofahreza/AIProxyAPI/internal/translator/gemini/openai/chat-completions"
 	_ "github.com/giofahreza/AIProxyAPI/internal/translator/gemini/openai/responses"
 
+	_ "github.com/giofahreza/AIProxyAPI/internal/translator/openai/anthropic"
 	_ "github.com/giofahreza/AIProxyAPI/internal/translator/openai/claude"
 	_ "github.com/giofahreza/AIProxyAPI/internal/translator/openai/gemini"
 	_ "github.com/giofahreza/AIProxyAPI/internal/translator/openai/gemini-cli"

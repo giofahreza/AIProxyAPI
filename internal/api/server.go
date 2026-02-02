@@ -33,6 +33,7 @@ import (
 	"github.com/giofahreza/AIProxyAPI/internal/util"
 	sdkaccess "github.com/giofahreza/AIProxyAPI/sdk/access"
 	"github.com/giofahreza/AIProxyAPI/sdk/api/handlers"
+	"github.com/giofahreza/AIProxyAPI/sdk/api/handlers/anthropic"
 	"github.com/giofahreza/AIProxyAPI/sdk/api/handlers/claude"
 	"github.com/giofahreza/AIProxyAPI/sdk/api/handlers/gemini"
 	"github.com/giofahreza/AIProxyAPI/sdk/api/handlers/openai"
@@ -331,6 +332,7 @@ func (s *Server) setupRoutes() {
 	geminiHandlers := gemini.NewGeminiAPIHandler(s.handlers)
 	geminiCLIHandlers := gemini.NewGeminiCLIAPIHandler(s.handlers)
 	claudeCodeHandlers := claude.NewClaudeCodeAPIHandler(s.handlers)
+	anthropicHandlers := anthropic.NewAnthropicAPIHandler(s.handlers)
 	openaiResponsesHandlers := openai.NewOpenAIResponsesAPIHandler(s.handlers)
 
 	// OpenAI compatible API routes
@@ -344,6 +346,16 @@ func (s *Server) setupRoutes() {
 		v1.POST("/messages", claudeCodeHandlers.ClaudeMessages)
 		v1.POST("/messages/count_tokens", claudeCodeHandlers.ClaudeCountTokens)
 		v1.POST("/responses", openaiResponsesHandlers.Responses)
+	}
+
+	// Anthropic compatible API routes
+	anthropicAPI := s.engine.Group("/api/anthropic/v1")
+	anthropicAPI.Use(AuthMiddleware(s.accessManager))
+	anthropicAPI.Use(middleware.LimitsMiddleware(s.limitsEnforcer))
+	{
+		anthropicAPI.GET("/models", anthropicHandlers.AnthropicModels)
+		anthropicAPI.POST("/messages", anthropicHandlers.AnthropicMessages)
+		anthropicAPI.POST("/messages/count_tokens", anthropicHandlers.AnthropicCountTokens)
 	}
 
 	// Gemini compatible API routes
