@@ -6,7 +6,7 @@
 // Key improvements:
 // - System messages use string format (not array)
 // - Text-only user/assistant messages use string format (not array)
-// - RFC 8259 hint only included for models that need it
+// - No RFC 8259 hint injected (modern models handle JSON natively)
 package anthropic
 
 import (
@@ -17,19 +17,6 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
-
-// needsRFC8259Hint determines if a model needs the RFC 8259 hint for JSON formatting.
-// Skip for well-known models that handle JSON natively.
-func needsRFC8259Hint(model string) bool {
-	lower := strings.ToLower(model)
-	prefixes := []string{"gpt-", "claude-", "gemini-", "o1", "o3", "o4"}
-	for _, p := range prefixes {
-		if strings.HasPrefix(lower, p) {
-			return false
-		}
-	}
-	return true
-}
 
 // ConvertAnthropicRequestToOpenAI parses and transforms an Anthropic API request into OpenAI Chat Completions API format.
 // It extracts the model name, system instruction, message contents, and tool declarations
@@ -108,19 +95,15 @@ func ConvertAnthropicRequestToOpenAI(modelName string, inputRawJSON []byte, stre
 	// Process messages and system
 	var messagesJSON = "[]"
 
-	// Handle system message first - as string, not array
+	// Handle system message first - as string, not array.
+	// No RFC 8259 hint is injected - modern models handle JSON natively
+	// and the hint wastes ~35 tokens per request.
 	var systemText strings.Builder
-	if needsRFC8259Hint(modelName) {
-		systemText.WriteString("Use ANY tool, the parameters MUST accord with RFC 8259 (The JavaScript Object Notation (JSON) Data Interchange Format), the keys and value MUST be enclosed in double quotes.")
-	}
 
 	if system := root.Get("system"); system.Exists() {
 		if system.Type == gjson.String {
 			systemStr := system.String()
 			if systemStr != "" {
-				if systemText.Len() > 0 {
-					systemText.WriteString("\n\n")
-				}
 				systemText.WriteString(systemStr)
 			}
 		} else if system.Type == gjson.JSON && system.IsArray() {

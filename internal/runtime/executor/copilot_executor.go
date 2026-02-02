@@ -18,6 +18,7 @@ import (
 	cliproxyexecutor "github.com/giofahreza/AIProxyAPI/sdk/cliproxy/executor"
 	sdktranslator "github.com/giofahreza/AIProxyAPI/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
@@ -59,6 +60,7 @@ func (e *CopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, 
 		return resp, errValidate
 	}
 	body = applyPayloadConfigWithRoot(e.cfg, req.Model, to.String(), "", body, originalTranslated)
+	body = applyCopilotBodyOptimizations(body)
 
 	url := strings.TrimSuffix(baseURL, "/") + "/chat/completions"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
@@ -66,6 +68,7 @@ func (e *CopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, 
 		return resp, err
 	}
 	applyCopilotHeaders(httpReq, token)
+	httpReq.Header.Set("x-initiator", detectLastMessageRole(body))
 	if containsVisionContent(body) {
 		httpReq.Header.Set("Copilot-Vision-Request", "true")
 	}
@@ -148,6 +151,7 @@ func (e *CopilotExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.
 	}
 	body, _ = sjson.SetBytes(body, "stream_options.include_usage", true)
 	body = applyPayloadConfigWithRoot(e.cfg, req.Model, to.String(), "", body, originalTranslated)
+	body = applyCopilotBodyOptimizations(body)
 
 	url := strings.TrimSuffix(baseURL, "/") + "/chat/completions"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
@@ -155,6 +159,7 @@ func (e *CopilotExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.
 		return nil, err
 	}
 	applyCopilotHeaders(httpReq, token)
+	httpReq.Header.Set("x-initiator", detectLastMessageRole(body))
 	if containsVisionContent(body) {
 		httpReq.Header.Set("Copilot-Vision-Request", "true")
 	}
@@ -293,12 +298,39 @@ func applyCopilotHeaders(req *http.Request, token string) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "GitHubCopilotChat/1.0")
-	req.Header.Set("Editor-Version", "vscode/1.85.0")
-	req.Header.Set("Editor-Plugin-Version", "copilot-chat/0.11.1")
+	req.Header.Set("Editor-Version", "vscode/1.95.0")
+	req.Header.Set("Editor-Plugin-Version", "copilot-chat/0.24.2")
 	req.Header.Set("Openai-Organization", "github-copilot")
-	req.Header.Set("Openai-Intent", "conversation-panel")
+	req.Header.Set("Openai-Intent", "conversation-edits")
 	req.Header.Set("VScode-SessionId", randomHex(16))
 	req.Header.Set("VScode-MachineId", randomHex(32))
+}
+
+// applyCopilotBodyOptimizations applies Copilot-specific body optimizations:
+// - Removes max_tokens (let Copilot decide; saves quota allocation)
+// - Sets store=false (don't store conversations)
+func applyCopilotBodyOptimizations(body []byte) []byte {
+	body, _ = sjson.DeleteBytes(body, "max_tokens")
+	body, _ = sjson.SetBytes(body, "store", false)
+	return body
+}
+
+// detectLastMessageRole returns "agent" if the last message is not from a user,
+// "user" otherwise. This helps Copilot distinguish agent-initiated vs user-initiated turns.
+func detectLastMessageRole(body []byte) string {
+	messages := gjson.GetBytes(body, "messages")
+	if !messages.Exists() || !messages.IsArray() {
+		return "user"
+	}
+	arr := messages.Array()
+	if len(arr) == 0 {
+		return "user"
+	}
+	lastRole := arr[len(arr)-1].Get("role").String()
+	if lastRole != "user" {
+		return "agent"
+	}
+	return "user"
 }
 
 // randomHex generates a random hex string of specified byte length
