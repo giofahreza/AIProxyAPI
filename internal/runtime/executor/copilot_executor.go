@@ -309,9 +309,58 @@ func applyCopilotHeaders(req *http.Request, token string) {
 // applyCopilotBodyOptimizations applies Copilot-specific body optimizations:
 // - Removes max_tokens (let Copilot decide; saves quota allocation)
 // - Sets store=false (don't store conversations)
+// - Adds copilot_cache_control to first 2 system msgs + last 2 non-system msgs
 func applyCopilotBodyOptimizations(body []byte) []byte {
 	body, _ = sjson.DeleteBytes(body, "max_tokens")
 	body, _ = sjson.SetBytes(body, "store", false)
+	body = applyCopilotCacheControl(body)
+	return body
+}
+
+// applyCopilotCacheControl marks the first 2 system messages and last 2 non-system
+// messages with copilot_cache_control for prompt caching on the Copilot backend.
+func applyCopilotCacheControl(body []byte) []byte {
+	messages := gjson.GetBytes(body, "messages")
+	if !messages.Exists() || !messages.IsArray() {
+		return body
+	}
+	arr := messages.Array()
+	if len(arr) == 0 {
+		return body
+	}
+
+	cacheControl := map[string]string{"type": "ephemeral"}
+
+	// Collect indices: first 2 system, last 2 non-system
+	marked := make(map[int]bool)
+
+	systemCount := 0
+	for i, msg := range arr {
+		if msg.Get("role").String() == "system" {
+			marked[i] = true
+			systemCount++
+			if systemCount >= 2 {
+				break
+			}
+		}
+	}
+
+	nonSystemCount := 0
+	for i := len(arr) - 1; i >= 0; i-- {
+		if arr[i].Get("role").String() != "system" {
+			marked[i] = true
+			nonSystemCount++
+			if nonSystemCount >= 2 {
+				break
+			}
+		}
+	}
+
+	for idx := range marked {
+		path := fmt.Sprintf("messages.%d.copilot_cache_control", idx)
+		body, _ = sjson.SetBytes(body, path, cacheControl)
+	}
+
 	return body
 }
 
