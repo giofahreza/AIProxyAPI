@@ -243,7 +243,9 @@ async function fetchAndRenderQuota(authIndex, type, cardId, cred) {
 // === Codex Quota ===
 async function renderCodexQuota(authIndex, cred) {
     const headers = {
-        'Authorization': 'Bearer $TOKEN$'
+        'Authorization': 'Bearer $TOKEN$',
+        'Content-Type': 'application/json',
+        'User-Agent': 'codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal'
     };
     // Add chatgpt_account_id if available
     const accountId = cred?.chatgpt_account_id || cred?.chatgptAccountId
@@ -277,46 +279,110 @@ async function renderCodexQuota(authIndex, cred) {
 
     let html = '';
 
+    // Plan type
+    const planType = data.plan_type || data.planType;
+    if (planType) {
+        html += `<div style="margin-bottom:8px;font-size:13px;color:var(--text-secondary);">Plan: <strong>${escapeHtml(planType)}</strong></div>`;
+    }
+
     // Rate limit (code generation)
-    if (data.rate_limit) {
-        html += renderCodexRateLimitSection('Code Generation', data.rate_limit);
+    const rateLimit = data.rate_limit ?? data.rateLimit;
+    if (rateLimit) {
+        html += renderCodexRateLimitSection('Code Generation', rateLimit);
     }
 
     // Code review rate limit
-    if (data.code_review_rate_limit) {
-        html += renderCodexRateLimitSection('Code Review', data.code_review_rate_limit);
+    const codeReviewLimit = data.code_review_rate_limit ?? data.codeReviewRateLimit;
+    if (codeReviewLimit) {
+        html += renderCodexRateLimitSection('Code Review', codeReviewLimit);
     }
 
     return html || '<div class="text-muted" style="font-size:13px;">No rate limit data in response.</div>';
 }
 
+function getCodexWindowSeconds(window) {
+    const raw = window.limit_window_seconds ?? window.limitWindowSeconds;
+    if (raw === null || raw === undefined) return 0;
+    return typeof raw === 'number' ? raw : parseFloat(raw) || 0;
+}
+
+function getCodexUsedPercent(window) {
+    const raw = window.used_percent ?? window.usedPercent;
+    if (raw === null || raw === undefined) return null;
+    const val = typeof raw === 'number' ? raw : parseFloat(raw);
+    return isNaN(val) ? null : val;
+}
+
+function getCodexResetLabel(window) {
+    // Try reset_at (unix timestamp) first
+    const resetAt = window.reset_at ?? window.resetAt;
+    if (resetAt) {
+        const ts = typeof resetAt === 'number' ? resetAt : parseFloat(resetAt);
+        if (!isNaN(ts) && ts > 0) {
+            // reset_at could be seconds or milliseconds
+            const date = new Date(ts > 1e12 ? ts : ts * 1000);
+            return formatResetTime(date.toISOString());
+        }
+    }
+    // Try reset_after_seconds
+    const resetAfter = window.reset_after_seconds ?? window.resetAfterSeconds;
+    if (resetAfter) {
+        const secs = typeof resetAfter === 'number' ? resetAfter : parseFloat(resetAfter);
+        if (!isNaN(secs) && secs > 0) {
+            const mins = Math.floor(secs / 60);
+            if (mins < 60) return `in ${mins}m`;
+            const hours = Math.floor(mins / 60);
+            return `in ${hours}h ${mins % 60}m`;
+        }
+    }
+    return '';
+}
+
 function renderCodexRateLimitSection(title, rateLimit) {
+    const FIVE_HOUR_SECONDS = 18000;
+    const WEEK_SECONDS = 604800;
+
     let html = `<div style="margin-bottom:12px;"><strong style="color:var(--text-primary);font-size:13px;">${escapeHtml(title)}</strong></div>`;
 
-    const windows = rateLimit.windows || [];
-    for (const w of windows) {
-        const usedPct = (w.used_percent || 0) * 100;
-        const resetTime = w.reset_time ? formatResetTime(w.reset_time) : '';
-        const windowLabel = formatWindowDuration(w.window_duration_seconds || w.duration_seconds || 0);
+    // Extract primary and secondary windows
+    const primaryWindow = rateLimit.primary_window ?? rateLimit.primaryWindow ?? null;
+    const secondaryWindow = rateLimit.secondary_window ?? rateLimit.secondaryWindow ?? null;
 
-        html += renderProgressBar(
-            `${windowLabel} window`,
-            usedPct,
-            resetTime ? `Resets ${resetTime}` : ''
-        );
+    // Classify windows by duration
+    let fiveHourWindow = null;
+    let weeklyWindow = null;
+
+    for (const w of [primaryWindow, secondaryWindow]) {
+        if (!w) continue;
+        const seconds = getCodexWindowSeconds(w);
+        if (seconds === FIVE_HOUR_SECONDS && !fiveHourWindow) {
+            fiveHourWindow = w;
+        } else if (seconds === WEEK_SECONDS && !weeklyWindow) {
+            weeklyWindow = w;
+        } else if (!fiveHourWindow) {
+            fiveHourWindow = w;
+        } else if (!weeklyWindow) {
+            weeklyWindow = w;
+        }
+    }
+
+    if (fiveHourWindow) {
+        const pct = getCodexUsedPercent(fiveHourWindow);
+        if (pct !== null) {
+            const resetLabel = getCodexResetLabel(fiveHourWindow);
+            html += renderProgressBar('5-Hour Window', pct * 100, resetLabel ? `Resets ${resetLabel}` : '');
+        }
+    }
+
+    if (weeklyWindow) {
+        const pct = getCodexUsedPercent(weeklyWindow);
+        if (pct !== null) {
+            const resetLabel = getCodexResetLabel(weeklyWindow);
+            html += renderProgressBar('Weekly Window', pct * 100, resetLabel ? `Resets ${resetLabel}` : '');
+        }
     }
 
     return html;
-}
-
-function formatWindowDuration(seconds) {
-    if (!seconds) return 'Unknown';
-    const hours = seconds / 3600;
-    if (hours >= 24) {
-        const days = Math.floor(hours / 24);
-        return days === 7 ? 'Weekly' : `${days}-day`;
-    }
-    return `${Math.round(hours)}-hour`;
 }
 
 function formatResetTime(resetTime) {
@@ -348,7 +414,9 @@ function extractProjectIdFromAccount(account) {
 
 async function renderGeminiCliQuota(authIndex, cred) {
     const projectId = cred?.project_id || cred?.projectId
-        || extractProjectIdFromAccount(cred?.account) || '';
+        || extractProjectIdFromAccount(cred?.account)
+        || extractProjectIdFromAccount(cred?.metadata?.account)
+        || extractProjectIdFromAccount(cred?.attributes?.account) || '';
     if (!projectId) {
         return '<div class="quota-credential-error">No project ID found for this credential</div>';
     }
@@ -421,8 +489,46 @@ async function renderGeminiCliQuota(authIndex, cred) {
 }
 
 // === Antigravity Quota ===
+async function resolveAntigravityProjectId(cred) {
+    const DEFAULT_PROJECT = 'bamboo-precept-lgxtn';
+    // Check cred fields first
+    if (cred?.project_id) return cred.project_id;
+    if (cred?.projectId) return cred.projectId;
+
+    // Download auth file content and parse for project_id
+    const fileName = cred?.name || cred?.file_name || cred?.fileName;
+    if (!fileName) return DEFAULT_PROJECT;
+
+    try {
+        const fileContent = await API.downloadAuthFile(fileName);
+        // Backend returns application/json so API.request() auto-parses it
+        const parsed = typeof fileContent === 'string' ? JSON.parse(fileContent) : fileContent;
+        if (!parsed || typeof parsed !== 'object') return DEFAULT_PROJECT;
+
+        // Check top-level project_id
+        const topLevel = parsed.project_id || parsed.projectId;
+        if (typeof topLevel === 'string' && topLevel.trim()) return topLevel.trim();
+
+        // Check installed.project_id
+        if (parsed.installed && typeof parsed.installed === 'object') {
+            const installedPid = parsed.installed.project_id || parsed.installed.projectId;
+            if (typeof installedPid === 'string' && installedPid.trim()) return installedPid.trim();
+        }
+
+        // Check web.project_id
+        if (parsed.web && typeof parsed.web === 'object') {
+            const webPid = parsed.web.project_id || parsed.web.projectId;
+            if (typeof webPid === 'string' && webPid.trim()) return webPid.trim();
+        }
+    } catch (e) {
+        console.warn('Failed to resolve antigravity project_id from auth file:', e);
+    }
+
+    return DEFAULT_PROJECT;
+}
+
 async function renderAntigravityQuota(authIndex, cred) {
-    const projectId = cred?.project_id || cred?.projectId || 'bamboo-precept-lgxtn';
+    const projectId = await resolveAntigravityProjectId(cred);
     const body = JSON.stringify({ project: projectId });
 
     // Try primary URL first, fallback if needed
@@ -468,11 +574,55 @@ async function renderAntigravityQuota(authIndex, cred) {
         return `<div class="quota-credential-error">Failed to parse response</div>`;
     }
 
-    if (!data || !data.models || typeof data.models !== 'object' || Array.isArray(data.models)) {
+    if (!data || !data.models || typeof data.models !== 'object') {
         return '<div class="text-muted" style="font-size:13px;">No model data returned.</div>';
     }
 
-    // Predefined model groups matching CPAMC
+    const models = data.models;
+
+    // Extract quota info from a model entry (matches CPAMC getAntigravityQuotaInfo)
+    function getQuotaInfo(entry) {
+        if (!entry || typeof entry !== 'object') return { remainingFraction: null, resetTime: null, displayName: null };
+        const qi = entry.quotaInfo || entry.quota_info || {};
+        const rawRemaining = qi.remainingFraction ?? qi.remaining_fraction ?? qi.remaining;
+        let remainingFraction = null;
+        if (rawRemaining !== null && rawRemaining !== undefined) {
+            const val = typeof rawRemaining === 'number' ? rawRemaining : parseFloat(rawRemaining);
+            if (!isNaN(val)) remainingFraction = val > 1 ? val / 100 : val;
+        }
+        const resetTime = qi.resetTime || qi.reset_time || null;
+        const displayName = typeof entry.displayName === 'string' ? entry.displayName : null;
+        return { remainingFraction, resetTime, displayName };
+    }
+
+    // Build a group from a definition (matches CPAMC buildAntigravityQuotaGroups)
+    function buildGroup(def, overrideResetTime) {
+        const quotaEntries = [];
+        for (const identifier of def.identifiers) {
+            const match = findAntigravityModel(models, identifier);
+            if (!match) continue;
+            const info = getQuotaInfo(match.info);
+            // If remainingFraction is null but resetTime exists, treat as 0 (fully used)
+            const remaining = info.remainingFraction ?? (info.resetTime ? 0 : null);
+            if (remaining === null) continue;
+            quotaEntries.push({
+                id: match.id,
+                remainingFraction: remaining,
+                resetTime: info.resetTime,
+                displayName: info.displayName
+            });
+        }
+        if (quotaEntries.length === 0) return null;
+
+        const remainingFraction = Math.min(...quotaEntries.map(e => e.remainingFraction));
+        const resetTime = overrideResetTime || quotaEntries.map(e => e.resetTime).find(Boolean) || null;
+        const displayName = quotaEntries.map(e => e.displayName).find(Boolean);
+        const label = def.labelFromModel && displayName ? displayName : def.label;
+
+        return { label, remainingFraction, resetTime };
+    }
+
+    // Predefined model groups matching CPAMC constants
     const groupDefs = [
         { id: 'claude-gpt', label: 'Claude/GPT', identifiers: ['claude-sonnet-4-5-thinking', 'claude-opus-4-5-thinking', 'claude-sonnet-4-5', 'gpt-oss-120b-medium'] },
         { id: 'gemini-3-pro', label: 'Gemini 3 Pro', identifiers: ['gemini-3-pro-high', 'gemini-3-pro-low'] },
@@ -480,78 +630,47 @@ async function renderAntigravityQuota(authIndex, cred) {
         { id: 'gemini-2-5-flash-lite', label: 'Gemini 2.5 Flash Lite', identifiers: ['gemini-2.5-flash-lite'] },
         { id: 'gemini-2-5-cu', label: 'Gemini 2.5 CU', identifiers: ['rev19-uic3-1p'] },
         { id: 'gemini-3-flash', label: 'Gemini 3 Flash', identifiers: ['gemini-3-flash'] },
-        { id: 'gemini-3-pro-image', label: 'Gemini 3 Pro Image', identifiers: ['gemini-3-pro-image'] },
+        { id: 'gemini-3-pro-image', label: 'gemini-3-pro-image', identifiers: ['gemini-3-pro-image'], labelFromModel: true },
     ];
 
-    const models = data.models;
     let html = '';
-    const matchedModels = new Set();
+    let geminiProResetTime = null;
 
-    // Render grouped models
-    for (const group of groupDefs) {
-        let minRemaining = null;
-        let earliestReset = null;
+    // Build each group in order, matching CPAMC exactly
+    const [claudeDef, geminiProDef, flashDef, flashLiteDef, cuDef, geminiFlashDef, imageDef] = groupDefs;
 
-        for (const identifier of group.identifiers) {
-            const entry = findAntigravityModel(models, identifier);
-            if (!entry) continue;
-            matchedModels.add(entry.id);
-
-            const quotaInfo = entry.info?.quotaInfo || entry.info?.quota_info || {};
-            const remaining = quotaInfo.remainingFraction ?? quotaInfo.remaining_fraction ?? quotaInfo.remaining;
-            const resetTime = quotaInfo.resetTime || quotaInfo.reset_time;
-
-            if (remaining !== null && remaining !== undefined) {
-                const frac = typeof remaining === 'number' ? remaining : parseFloat(remaining);
-                if (!isNaN(frac) && (minRemaining === null || frac < minRemaining)) {
-                    minRemaining = frac;
-                }
-            } else if (resetTime) {
-                // Has reset time but no fraction = exhausted
-                if (minRemaining === null) minRemaining = 0;
-            }
-
-            if (resetTime && (!earliestReset || new Date(resetTime) < new Date(earliestReset))) {
-                earliestReset = resetTime;
-            }
-        }
-
-        if (minRemaining === null) continue;
-
-        const remainPct = Math.max(0, Math.min(1, minRemaining)) * 100;
-        const usedPct = 100 - remainPct;
-        html += renderProgressBar(
-            group.label,
-            usedPct,
-            earliestReset ? `Resets ${formatResetTime(earliestReset)}` : ''
-        );
+    const claudeGroup = buildGroup(claudeDef);
+    if (claudeGroup) {
+        const usedPct = (1 - Math.max(0, Math.min(1, claudeGroup.remainingFraction))) * 100;
+        html += renderProgressBar(claudeGroup.label, usedPct, claudeGroup.resetTime ? `Resets ${formatResetTime(claudeGroup.resetTime)}` : '');
     }
 
-    // Render ungrouped models that have quota info
-    for (const [modelId, modelInfo] of Object.entries(models)) {
-        if (matchedModels.has(modelId)) continue;
-        if (!modelInfo || typeof modelInfo !== 'object') continue;
-
-        const quotaInfo = modelInfo.quotaInfo || modelInfo.quota_info || {};
-        const remaining = quotaInfo.remainingFraction ?? quotaInfo.remaining_fraction ?? quotaInfo.remaining;
-        if (remaining === null || remaining === undefined) continue;
-
-        const frac = typeof remaining === 'number' ? remaining : parseFloat(remaining);
-        if (isNaN(frac)) continue;
-
-        matchedModels.add(modelId);
-        const displayName = modelInfo.displayName || modelId;
-        const remainPct = Math.max(0, Math.min(1, frac)) * 100;
-        const usedPct = 100 - remainPct;
-        const resetTime = quotaInfo.resetTime || quotaInfo.reset_time;
-        html += renderProgressBar(
-            displayName,
-            usedPct,
-            resetTime ? `Resets ${formatResetTime(resetTime)}` : ''
-        );
+    const geminiProGroup = buildGroup(geminiProDef);
+    if (geminiProGroup) {
+        geminiProResetTime = geminiProGroup.resetTime;
+        const usedPct = (1 - Math.max(0, Math.min(1, geminiProGroup.remainingFraction))) * 100;
+        html += renderProgressBar(geminiProGroup.label, usedPct, geminiProGroup.resetTime ? `Resets ${formatResetTime(geminiProGroup.resetTime)}` : '');
     }
 
-    return html || '<div class="text-muted" style="font-size:13px;">No quota data found in models response.</div>';
+    for (const def of [flashDef, flashLiteDef, cuDef, geminiFlashDef]) {
+        const group = buildGroup(def);
+        if (!group) continue;
+        const usedPct = (1 - Math.max(0, Math.min(1, group.remainingFraction))) * 100;
+        html += renderProgressBar(group.label, usedPct, group.resetTime ? `Resets ${formatResetTime(group.resetTime)}` : '');
+    }
+
+    // Image group uses geminiProResetTime as override
+    const imageGroup = buildGroup(imageDef, geminiProResetTime);
+    if (imageGroup) {
+        const usedPct = (1 - Math.max(0, Math.min(1, imageGroup.remainingFraction))) * 100;
+        html += renderProgressBar(imageGroup.label, usedPct, imageGroup.resetTime ? `Resets ${formatResetTime(imageGroup.resetTime)}` : '');
+    }
+
+    if (!html) {
+        html = `<div class="text-muted" style="font-size:13px;">${Object.keys(models).length} model(s) found but none matched known quota groups.</div>`;
+    }
+
+    return html;
 }
 
 // === Claude Quota ===
