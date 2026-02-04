@@ -472,6 +472,11 @@ const API = {
         }
     },
 
+    // === API Call Proxy ===
+    apiCall(params) {
+        return this.post('/api-call', params);
+    },
+
     // === Ampcode ===
     getAmpcode() {
         return this.get('/ampcode');

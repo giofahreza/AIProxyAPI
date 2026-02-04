@@ -808,6 +808,7 @@ code {
 .file-type.qwen { background: rgba(108, 99, 255, 0.2); color: #6c63ff; }
 .file-type.iflow { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
 .file-type.antigravity { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+.file-type.copilot { background: rgba(36, 41, 47, 0.3); color: #f0f6fc; }
 
 .file-meta {
     font-size: 12px;
@@ -1400,4 +1401,178 @@ code {
 .badge-sm {
     font-size: 10px;
     padding: 2px 6px;
+}
+
+/* Quota Progress Bars */
+.quota-progress-container {
+    margin-bottom: 12px;
+}
+
+.quota-progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.quota-progress-label-name {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.quota-progress-label-value {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.quota-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.quota-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.quota-progress-fill.level-low {
+    background: var(--accent-green);
+}
+
+.quota-progress-fill.level-medium {
+    background: var(--accent-yellow);
+}
+
+.quota-progress-fill.level-high {
+    background: var(--accent-orange);
+}
+
+.quota-progress-fill.level-critical {
+    background: var(--accent-red);
+}
+
+.quota-progress-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Quota Credential Cards */
+.quota-credential-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.quota-credential-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.quota-credential-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quota-credential-title span {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.quota-credential-body {
+    padding-top: 8px;
+}
+
+.quota-credential-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 8px 0;
+}
+
+.quota-credential-loading .spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--bg-primary);
+    border-top: 2px solid var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.quota-credential-error {
+    color: var(--accent-red);
+    font-size: 13px;
+    padding: 8px 0;
+}
+
+/* Quota Section Group */
+.quota-section-group {
+    margin-bottom: 24px;
+}
+
+.quota-section-group-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Quota Model List for Antigravity */
+.quota-model-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.quota-model-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.quota-model-item.available {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.quota-model-item.unavailable {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    opacity: 0.6;
+}
+
+/* Refresh button styles */
+.btn-refresh {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.btn-refresh:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
 }
