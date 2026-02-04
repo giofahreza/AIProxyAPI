@@ -144,7 +144,7 @@ async function loadQuotaCredentials() {
         for (const type of sortedTypes) {
             const creds = groups[type];
             const typeLabel = getProviderLabel(type);
-            const hasQuota = ['codex', 'gemini-cli', 'antigravity', 'claude', 'copilot'].includes(type);
+            const hasQuota = ['codex', 'gemini-cli', 'antigravity', 'claude', 'copilot', 'qwen'].includes(type);
 
             html += `<div class="quota-section-group">`;
             html += `<div class="quota-section-group-title">
@@ -182,7 +182,7 @@ async function loadQuotaCredentials() {
 
         // Fetch quota for supported providers
         for (const type of sortedTypes) {
-            if (!['codex', 'gemini-cli', 'antigravity', 'claude', 'copilot'].includes(type)) continue;
+            if (!['codex', 'gemini-cli', 'antigravity', 'claude', 'copilot', 'qwen'].includes(type)) continue;
             for (const cred of groups[type]) {
                 const authIndex = cred.auth_index || cred.authIndex || '';
                 const cardId = `quota-card-${authIndex.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -231,6 +231,8 @@ async function fetchAndRenderQuota(authIndex, type, cardId, cred) {
             html = await renderClaudeQuota(authIndex, cred);
         } else if (type === 'copilot') {
             html = await renderCopilotQuota(authIndex, cred);
+        } else if (type === 'qwen') {
+            html = await renderTokenMetadataQuota(authIndex, cred, 'Qwen');
         }
         bodyEl.innerHTML = html || '<div class="text-muted" style="font-size:13px;">No quota data available.</div>';
     } catch (error) {
@@ -337,9 +339,20 @@ function formatResetTime(resetTime) {
 }
 
 // === Gemini CLI Quota ===
+function extractProjectIdFromAccount(account) {
+    if (typeof account !== 'string') return null;
+    const matches = [...account.matchAll(/\(([^()]+)\)/g)];
+    if (matches.length === 0) return null;
+    return matches[matches.length - 1]?.[1]?.trim() || null;
+}
+
 async function renderGeminiCliQuota(authIndex, cred) {
-    const projectId = cred?.project_id || cred?.projectId || '';
-    const body = projectId ? JSON.stringify({ project: projectId }) : '{}';
+    const projectId = cred?.project_id || cred?.projectId
+        || extractProjectIdFromAccount(cred?.account) || '';
+    if (!projectId) {
+        return '<div class="quota-credential-error">No project ID found for this credential</div>';
+    }
+    const body = JSON.stringify({ project: projectId });
 
     const resp = await API.apiCall({
         auth_index: authIndex,
@@ -409,12 +422,13 @@ async function renderGeminiCliQuota(authIndex, cred) {
 
 // === Antigravity Quota ===
 async function renderAntigravityQuota(authIndex, cred) {
-    const projectId = cred?.project_id || cred?.projectId || '';
-    const body = projectId ? JSON.stringify({ project: projectId }) : '{}';
+    const projectId = cred?.project_id || cred?.projectId || 'bamboo-precept-lgxtn';
+    const body = JSON.stringify({ project: projectId });
 
     // Try primary URL first, fallback if needed
     const urls = [
         'https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels',
+        'https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels',
         'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels'
     ];
 
@@ -428,7 +442,8 @@ async function renderAntigravityQuota(authIndex, cred) {
                 url: url,
                 header: {
                     'Authorization': 'Bearer $TOKEN$',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'antigravity/1.11.5 windows/amd64'
                 },
                 data: body
             });
@@ -518,39 +533,56 @@ async function renderClaudeQuota(authIndex, cred) {
 
         let html = '';
 
-        // Five-hour window
-        const fiveHour = data.five_hour || data.fiveHour;
-        if (fiveHour) {
-            const utilization = fiveHour.utilization ?? fiveHour.used_percent ?? null;
-            if (utilization !== null) {
-                const usedPct = utilization * 100;
-                const resetTime = fiveHour.reset_time || fiveHour.resetTime;
-                html += renderProgressBar(
-                    '5-Hour Window',
-                    usedPct,
-                    resetTime ? `Resets ${formatResetTime(resetTime)}` : ''
-                );
+        // Known windows in the response
+        const windowDefs = [
+            { key: 'five_hour', label: '5-Hour Window' },
+            { key: 'seven_day', label: 'Weekly Window' },
+            { key: 'seven_day_sonnet', label: 'Weekly Sonnet' },
+            { key: 'seven_day_opus', label: 'Weekly Opus' },
+            { key: 'seven_day_cowork', label: 'Weekly Cowork' },
+            { key: 'seven_day_oauth_apps', label: 'Weekly OAuth Apps' },
+            { key: 'iguana_necktie', label: 'Iguana Necktie' },
+        ];
+
+        for (const def of windowDefs) {
+            const windowData = data[def.key];
+            if (!windowData || typeof windowData !== 'object') continue;
+
+            const utilization = windowData.utilization;
+            if (utilization === null || utilization === undefined) continue;
+
+            // utilization is already a percentage (e.g. 23.0 = 23%)
+            const usedPct = utilization;
+            const resetTime = windowData.resets_at || windowData.reset_time || windowData.resetTime;
+            html += renderProgressBar(
+                def.label,
+                usedPct,
+                resetTime ? `Resets ${formatResetTime(resetTime)}` : ''
+            );
+        }
+
+        // Extra usage section
+        if (data.extra_usage && typeof data.extra_usage === 'object') {
+            const extra = data.extra_usage;
+            if (extra.is_enabled) {
+                const usedCredits = extra.used_credits ?? 0;
+                const monthlyLimit = extra.monthly_limit;
+                const utilization = extra.utilization;
+                if (monthlyLimit) {
+                    const pct = (usedCredits / monthlyLimit) * 100;
+                    html += renderProgressBar(
+                        'Extra Usage',
+                        pct,
+                        `$${usedCredits.toFixed(2)} / $${monthlyLimit.toFixed(2)}`
+                    );
+                } else if (utilization !== null && utilization !== undefined) {
+                    html += renderProgressBar('Extra Usage', utilization, '');
+                }
             }
         }
 
-        // Seven-day / weekly window
-        const sevenDay = data.seven_day || data.sevenDay || data.weekly;
-        if (sevenDay) {
-            const utilization = sevenDay.utilization ?? sevenDay.used_percent ?? null;
-            if (utilization !== null) {
-                const usedPct = utilization * 100;
-                const resetTime = sevenDay.reset_time || sevenDay.resetTime;
-                html += renderProgressBar(
-                    'Weekly Window',
-                    usedPct,
-                    resetTime ? `Resets ${formatResetTime(resetTime)}` : ''
-                );
-            }
-        }
-
-        // If we got data but no recognized windows, show raw info
-        if (!html && data) {
-            html = '<div class="text-muted" style="font-size:13px;">Usage data received but no rate limit windows found.</div>';
+        if (!html) {
+            html = '<div class="text-muted" style="font-size:13px;">No usage windows found in response.</div>';
         }
 
         return html;
@@ -561,17 +593,24 @@ async function renderClaudeQuota(authIndex, cred) {
 
 // === Copilot Info ===
 async function renderCopilotQuota(authIndex, cred) {
-    // No public quota API exists for GitHub Copilot individual users.
-    // Display available token metadata from the credential.
+    return renderTokenMetadataQuota(authIndex, cred, 'Copilot', 'github.com/settings/billing');
+}
+
+// === Generic Token Metadata Display ===
+async function renderTokenMetadataQuota(authIndex, cred, providerName, billingUrl) {
     let html = '';
-
-    const sku = cred?.sku || cred?.plan;
-    const email = cred?.email;
-    const expireRaw = cred?.copilot_expire || cred?.copilotExpire;
-    const lastRefresh = cred?.last_refresh || cred?.lastRefresh;
-
     const items = [];
 
+    const sku = cred?.sku || cred?.plan || cred?.account_type;
+    const email = cred?.email;
+    const status = cred?.status;
+    const expireRaw = cred?.copilot_expire || cred?.copilotExpire || cred?.expired || cred?.expire;
+    const lastRefresh = cred?.last_refresh || cred?.lastRefresh;
+
+    if (status) {
+        const statusClass = status === 'ok' || status === 'active' ? 'text-success' : 'text-warning';
+        items.push(`<strong>Status:</strong> <span class="${statusClass}">${escapeHtml(status)}</span>`);
+    }
     if (sku) {
         items.push(`<strong>Plan:</strong> ${escapeHtml(sku)}`);
     }
@@ -580,25 +619,31 @@ async function renderCopilotQuota(authIndex, cred) {
     }
     if (expireRaw) {
         const expireDate = new Date(typeof expireRaw === 'number' ? expireRaw * 1000 : expireRaw);
-        const now = new Date();
-        const isExpired = expireDate <= now;
-        const timeStr = isExpired ? 'Expired' : formatResetTime(expireDate.toISOString());
-        const statusClass = isExpired ? 'text-danger' : 'text-success';
-        items.push(`<strong>Token Expires:</strong> <span class="${statusClass}">${escapeHtml(timeStr)}</span>`);
+        if (!isNaN(expireDate.getTime())) {
+            const now = new Date();
+            const isExpired = expireDate <= now;
+            const timeStr = isExpired ? 'Expired' : formatResetTime(expireDate.toISOString());
+            const statusClass = isExpired ? 'text-danger' : 'text-success';
+            items.push(`<strong>Token Expires:</strong> <span class="${statusClass}">${escapeHtml(timeStr)}</span>`);
+        }
     }
     if (lastRefresh) {
         const refreshDate = new Date(typeof lastRefresh === 'number' ? lastRefresh * 1000 : lastRefresh);
-        items.push(`<strong>Last Refresh:</strong> ${escapeHtml(refreshDate.toLocaleString())}`);
+        if (!isNaN(refreshDate.getTime())) {
+            items.push(`<strong>Last Refresh:</strong> ${escapeHtml(refreshDate.toLocaleString())}`);
+        }
     }
 
     if (items.length > 0) {
         html = '<div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">';
         html += items.join('<br>');
         html += '</div>';
-        html += '<div class="quota-progress-detail" style="margin-top:8px;">No public quota API available for Copilot. Check usage at github.com/settings/billing</div>';
-    } else {
-        html = '<div class="text-muted" style="font-size:13px;">No public quota API available for Copilot. Check usage at <a href="https://github.com/settings/billing" target="_blank" style="color:var(--accent-blue);">github.com/settings/billing</a></div>';
     }
+
+    const note = billingUrl
+        ? `No public quota API available for ${escapeHtml(providerName)}. Check usage at <a href="https://${escapeHtml(billingUrl)}" target="_blank" style="color:var(--accent-blue);">${escapeHtml(billingUrl)}</a>`
+        : `No public quota API available for ${escapeHtml(providerName)}.`;
+    html += `<div class="quota-progress-detail" style="margin-top:8px;">${note}</div>`;
 
     return html;
 }
