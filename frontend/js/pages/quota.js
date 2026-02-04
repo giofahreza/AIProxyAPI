@@ -118,7 +118,7 @@ async function loadQuotaCredentials() {
 
     try {
         const authFiles = await API.listAuthFiles();
-        const files = authFiles['auth-files'] || authFiles.authFiles || authFiles || [];
+        const files = authFiles.files || authFiles['auth-files'] || authFiles.authFiles || authFiles || [];
 
         if (!Array.isArray(files) || files.length === 0) {
             listEl.innerHTML = '<div class="empty-state"><p class="text-muted">No auth credentials found. Add credentials via the OAuth page.</p></div>';
@@ -244,7 +244,8 @@ async function renderCodexQuota(authIndex, cred) {
         'Authorization': 'Bearer $TOKEN$'
     };
     // Add chatgpt_account_id if available
-    const accountId = cred?.chatgpt_account_id || cred?.chatgptAccountId;
+    const accountId = cred?.chatgpt_account_id || cred?.chatgptAccountId
+        || cred?.id_token?.chatgpt_account_id || cred?.id_token?.chatgptAccountId;
     if (accountId) {
         headers['Chatgpt-Account-Id'] = accountId;
     }
