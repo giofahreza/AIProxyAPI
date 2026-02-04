@@ -468,30 +468,90 @@ async function renderAntigravityQuota(authIndex, cred) {
         return `<div class="quota-credential-error">Failed to parse response</div>`;
     }
 
-    if (!data || !data.models) {
+    if (!data || !data.models || typeof data.models !== 'object' || Array.isArray(data.models)) {
         return '<div class="text-muted" style="font-size:13px;">No model data returned.</div>';
     }
 
-    let html = '<div style="margin-bottom:8px;"><strong style="color:var(--text-primary);font-size:13px;">Available Models</strong></div>';
-    html += '<div class="quota-model-list">';
+    // Predefined model groups matching CPAMC
+    const groupDefs = [
+        { id: 'claude-gpt', label: 'Claude/GPT', identifiers: ['claude-sonnet-4-5-thinking', 'claude-opus-4-5-thinking', 'claude-sonnet-4-5', 'gpt-oss-120b-medium'] },
+        { id: 'gemini-3-pro', label: 'Gemini 3 Pro', identifiers: ['gemini-3-pro-high', 'gemini-3-pro-low'] },
+        { id: 'gemini-2-5-flash', label: 'Gemini 2.5 Flash', identifiers: ['gemini-2.5-flash', 'gemini-2.5-flash-thinking'] },
+        { id: 'gemini-2-5-flash-lite', label: 'Gemini 2.5 Flash Lite', identifiers: ['gemini-2.5-flash-lite'] },
+        { id: 'gemini-2-5-cu', label: 'Gemini 2.5 CU', identifiers: ['rev19-uic3-1p'] },
+        { id: 'gemini-3-flash', label: 'Gemini 3 Flash', identifiers: ['gemini-3-flash'] },
+        { id: 'gemini-3-pro-image', label: 'Gemini 3 Pro Image', identifiers: ['gemini-3-pro-image'] },
+    ];
 
     const models = data.models;
-    if (typeof models === 'object' && !Array.isArray(models)) {
-        // models is an object with model names as keys
-        for (const [modelName, modelInfo] of Object.entries(models)) {
-            const available = modelInfo?.available !== false;
-            html += `<div class="quota-model-item ${available ? 'available' : 'unavailable'}">${escapeHtml(modelName)}</div>`;
+    let html = '';
+    const matchedModels = new Set();
+
+    // Render grouped models
+    for (const group of groupDefs) {
+        let minRemaining = null;
+        let earliestReset = null;
+
+        for (const identifier of group.identifiers) {
+            const entry = findAntigravityModel(models, identifier);
+            if (!entry) continue;
+            matchedModels.add(entry.id);
+
+            const quotaInfo = entry.info?.quotaInfo || entry.info?.quota_info || {};
+            const remaining = quotaInfo.remainingFraction ?? quotaInfo.remaining_fraction ?? quotaInfo.remaining;
+            const resetTime = quotaInfo.resetTime || quotaInfo.reset_time;
+
+            if (remaining !== null && remaining !== undefined) {
+                const frac = typeof remaining === 'number' ? remaining : parseFloat(remaining);
+                if (!isNaN(frac) && (minRemaining === null || frac < minRemaining)) {
+                    minRemaining = frac;
+                }
+            } else if (resetTime) {
+                // Has reset time but no fraction = exhausted
+                if (minRemaining === null) minRemaining = 0;
+            }
+
+            if (resetTime && (!earliestReset || new Date(resetTime) < new Date(earliestReset))) {
+                earliestReset = resetTime;
+            }
         }
-    } else if (Array.isArray(models)) {
-        for (const model of models) {
-            const name = typeof model === 'string' ? model : (model.name || model.id || 'unknown');
-            const available = typeof model === 'string' ? true : (model.available !== false);
-            html += `<div class="quota-model-item ${available ? 'available' : 'unavailable'}">${escapeHtml(name)}</div>`;
-        }
+
+        if (minRemaining === null) continue;
+
+        const remainPct = Math.max(0, Math.min(1, minRemaining)) * 100;
+        const usedPct = 100 - remainPct;
+        html += renderProgressBar(
+            group.label,
+            usedPct,
+            earliestReset ? `Resets ${formatResetTime(earliestReset)}` : ''
+        );
     }
 
-    html += '</div>';
-    return html;
+    // Render ungrouped models that have quota info
+    for (const [modelId, modelInfo] of Object.entries(models)) {
+        if (matchedModels.has(modelId)) continue;
+        if (!modelInfo || typeof modelInfo !== 'object') continue;
+
+        const quotaInfo = modelInfo.quotaInfo || modelInfo.quota_info || {};
+        const remaining = quotaInfo.remainingFraction ?? quotaInfo.remaining_fraction ?? quotaInfo.remaining;
+        if (remaining === null || remaining === undefined) continue;
+
+        const frac = typeof remaining === 'number' ? remaining : parseFloat(remaining);
+        if (isNaN(frac)) continue;
+
+        matchedModels.add(modelId);
+        const displayName = modelInfo.displayName || modelId;
+        const remainPct = Math.max(0, Math.min(1, frac)) * 100;
+        const usedPct = 100 - remainPct;
+        const resetTime = quotaInfo.resetTime || quotaInfo.reset_time;
+        html += renderProgressBar(
+            displayName,
+            usedPct,
+            resetTime ? `Resets ${formatResetTime(resetTime)}` : ''
+        );
+    }
+
+    return html || '<div class="text-muted" style="font-size:13px;">No quota data found in models response.</div>';
 }
 
 // === Claude Quota ===
@@ -646,6 +706,21 @@ async function renderTokenMetadataQuota(authIndex, cred, providerName, billingUr
     html += `<div class="quota-progress-detail" style="margin-top:8px;">${note}</div>`;
 
     return html;
+}
+
+// === Antigravity Helpers ===
+function findAntigravityModel(models, identifier) {
+    // Direct key match
+    if (models[identifier]) {
+        return { id: identifier, info: models[identifier] };
+    }
+    // Match by displayName
+    for (const [id, entry] of Object.entries(models)) {
+        if (entry && typeof entry.displayName === 'string' && entry.displayName.toLowerCase() === identifier.toLowerCase()) {
+            return { id, info: entry };
+        }
+    }
+    return null;
 }
 
 // === Shared rendering helpers ===
