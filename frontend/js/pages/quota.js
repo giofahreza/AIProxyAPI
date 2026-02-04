@@ -487,13 +487,22 @@ async function renderClaudeQuota(authIndex, cred) {
             method: 'GET',
             url: 'https://api.anthropic.com/api/oauth/usage',
             header: {
-                'Authorization': 'Bearer $TOKEN$'
+                'Authorization': 'Bearer $TOKEN$',
+                'Anthropic-Version': '2023-06-01',
+                'Anthropic-Beta': 'claude-code-20250219,oauth-2025-04-20',
+                'Anthropic-Dangerous-Direct-Browser-Access': 'true',
+                'X-App': 'cli'
             }
         });
 
         const statusCode = resp.status_code || resp.statusCode;
         if (statusCode && statusCode !== 200) {
-            return `<div class="quota-credential-error">API returned status ${statusCode} (usage endpoint may require user:profile scope)</div>`;
+            const hint = statusCode === 401
+                ? 'Token may be expired - try re-authenticating via OAuth page'
+                : statusCode === 403
+                    ? 'OAuth token may be missing user:profile scope'
+                    : '';
+            return `<div class="quota-credential-error">API returned status ${statusCode}${hint ? ' (' + hint + ')' : ''}</div>`;
         }
 
         let data;
