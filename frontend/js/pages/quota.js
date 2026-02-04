@@ -413,12 +413,39 @@ function extractProjectIdFromAccount(account) {
 }
 
 async function renderGeminiCliQuota(authIndex, cred) {
-    const projectId = cred?.project_id || cred?.projectId
-        || extractProjectIdFromAccount(cred?.account)
-        || extractProjectIdFromAccount(cred?.metadata?.account)
-        || extractProjectIdFromAccount(cred?.attributes?.account) || '';
+    // Check multiple locations for project_id
+    let projectId = cred?.project_id || cred?.projectId;
+
+    // Try extracting from account field (format: "email (project_id)")
     if (!projectId) {
-        return '<div class="quota-credential-error">No project ID found for this credential</div>';
+        projectId = extractProjectIdFromAccount(cred?.account)
+            || extractProjectIdFromAccount(cred?.metadata?.account)
+            || extractProjectIdFromAccount(cred?.attributes?.account);
+    }
+
+    // Try metadata.project_id directly
+    if (!projectId && cred?.metadata?.project_id) {
+        projectId = cred.metadata.project_id;
+    }
+
+    // Last resort: download auth file to extract project_id (similar to antigravity)
+    if (!projectId) {
+        const fileName = cred?.name || cred?.file_name || cred?.fileName;
+        if (fileName) {
+            try {
+                const fileContent = await API.downloadAuthFile(fileName);
+                const parsed = typeof fileContent === 'string' ? JSON.parse(fileContent) : fileContent;
+                if (parsed && typeof parsed === 'object') {
+                    projectId = parsed.project_id || parsed.projectId || '';
+                }
+            } catch (e) {
+                console.warn('Failed to download gemini-cli auth file for project_id:', e);
+            }
+        }
+    }
+
+    if (!projectId) {
+        return '<div class="quota-credential-error">No project ID found for this credential. Expected format: email (project_id) in account field.</div>';
     }
     const body = JSON.stringify({ project: projectId });
 
