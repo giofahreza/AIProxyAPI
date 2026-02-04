@@ -118,9 +118,15 @@ async function loadQuotaCredentials() {
 
     try {
         const authFiles = await API.listAuthFiles();
-        const files = authFiles.files || authFiles['auth-files'] || authFiles.authFiles || authFiles || [];
+        let files = authFiles.files || authFiles['auth-files'] || authFiles.authFiles || authFiles || [];
 
-        if (!Array.isArray(files) || files.length === 0) {
+        // Filter out usage-statistics.json (internal app data, not an auth credential)
+        files = (Array.isArray(files) ? files : []).filter(f => {
+            const name = (f.name || '').toLowerCase();
+            return name !== 'usage-statistics.json';
+        });
+
+        if (files.length === 0) {
             listEl.innerHTML = '<div class="empty-state"><p class="text-muted">No auth credentials found. Add credentials via the OAuth page.</p></div>';
             return;
         }
